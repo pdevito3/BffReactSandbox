@@ -1,0 +1,6 @@
+@BespokeBff_HostAddress = http://localhost:5182
+
+GET {{BespokeBff_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
