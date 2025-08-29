@@ -1,6 +1,8 @@
 namespace BespokeBff.Endpoints.BFF;
 
+using Duende.AccessTokenManagement.OpenIdConnect;
 using Microsoft.AspNetCore.Authentication;
+
 
 public static class RefreshToken
 {
@@ -13,7 +15,13 @@ public static class RefreshToken
 
         try
         {
-            var tokenResult = await context.GetUserAccessTokenAsync();
+            var parameters = new UserTokenRequestParameters
+            {
+                // force token renewal even if current token is still valid
+                ForceRenewal = true
+            };
+            
+            var tokenResult = await context.GetUserAccessTokenAsync(parameters);
             
             if (!string.IsNullOrEmpty(tokenResult?.AccessToken))
             {
@@ -23,13 +31,11 @@ public static class RefreshToken
                     expiresAt = tokenResult.Expiration.ToString("O")
                 });
             }
-            else
-            {
-                return Results.BadRequest(new { 
-                    error = "Token refresh failed", 
-                    details = "No access token received" 
-                });
-            }
+
+            return Results.BadRequest(new { 
+                error = "Token refresh failed", 
+                details = "No access token received" 
+            });
         }
         catch (Exception ex)
         {

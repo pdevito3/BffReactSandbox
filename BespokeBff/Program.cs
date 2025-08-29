@@ -40,6 +40,9 @@ try
         options.ExpireTimeSpan = TimeSpan.FromHours(1);
         options.SlidingExpiration = true;
         
+        // automatically revoke refresh token at signout time
+        options.Events.OnSigningOut = async e => { await e.HttpContext.RevokeRefreshTokenAsync(); };
+        
     })
     .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
@@ -97,6 +100,9 @@ try
         };
         
         options.GetClaimsFromUserInfoEndpoint = true;
+        
+        // important! this store the access and refresh token in the authentication session
+        // this is needed to the standard token store to manage the artifacts
         options.SaveTokens = true;
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment(); 
         options.UsePkce = true;
