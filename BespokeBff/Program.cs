@@ -40,8 +40,18 @@ try
         options.ExpireTimeSpan = TimeSpan.FromHours(1);
         options.SlidingExpiration = true;
         
-        // automatically revoke refresh token at signout time
-        options.Events.OnSigningOut = async e => { await e.HttpContext.RevokeRefreshTokenAsync(); };
+        // automatically revoke refresh token at signout time (if supported)
+        options.Events.OnSigningOut = async e =>
+        {
+            try
+            {
+                await e.HttpContext.RevokeRefreshTokenAsync();
+            }
+            catch (InvalidOperationException)
+            {
+                Log.Debug("Refresh token revocation not supported by identity provider");
+            }
+        };
         
     })
     .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
@@ -63,30 +73,8 @@ try
         options.SignedOutCallbackPath = "/signout-callback-oidc";
         options.RemoteSignOutPath = "/signout-oidc";
         
-        // FusionAuth logout configuration
         options.Events = new OpenIdConnectEvents
         {
-            OnRedirectToIdentityProviderForSignOut = context =>
-            {
-                // Use FusionAuth's logout URL directly
-                var logoutUri = $"http://localhost:9011/oauth2/logout?client_id={context.Options.ClientId}";
-                
-                var postLogoutUri = context.Properties.RedirectUri;
-                if (!string.IsNullOrEmpty(postLogoutUri))
-                {
-                    if (postLogoutUri.StartsWith("/"))
-                    {
-                        var request = context.Request;
-                        postLogoutUri = request.Scheme + "://" + request.Host + request.PathBase + postLogoutUri;
-                    }
-                    logoutUri += $"&post_logout_redirect_uri={Uri.EscapeDataString(postLogoutUri)}";
-                }
-                
-                context.Response.Redirect(logoutUri);
-                context.HandleResponse();
-                
-                return Task.CompletedTask;
-            },
             OnRemoteFailure = (context) =>
             {
                 if (context.Failure is AuthenticationFailureException)

@@ -6,7 +6,8 @@
     "bffClientId": "f62e03d1-cbdb-4ff8-92e3-1966dc05d1ab",
     "bffClientSecret": "2274075d-3358-4f59-a13a-ddf4c6906b1e",
     "bffUrl": "http://localhost:3118",
-    "limsUiUrl": "http://localhost:4667"
+    "limsUiUrl": "http://localhost:4667",
+    "fusionAuthApplicationId": "3c219e58-ed0e-4b18-ad48-f4f92793ae32"
   },
   "apiKeys": [
     {
@@ -79,6 +80,7 @@
             "proofKeyForCodeExchangePolicy": "Required",
             "authorizedRedirectURLs": [
               "#{bffUrl}/signin-oidc",
+              "#{bffUrl}/signout-callback-oidc",
               "#{bffUrl}/",
               "#{limsUiUrl}/"
             ],
@@ -87,6 +89,7 @@
               "#{limsUiUrl}"
             ],
             "logoutURL": "#{bffUrl}/signout-callback-oidc",
+            "logoutBehavior": "AllApplications",
             "enabledGrants": [
               "authorization_code",
               "refresh_token"
@@ -119,6 +122,19 @@
           "applicationId": "#{bffApplicationId}",
           "userId": "#{testUserId}",
           "roles": []
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user/registration/#{adminUserId}",
+      "body": {
+        "registration": {
+          "applicationId": "#{fusionAuthApplicationId}",
+          "userId": "#{adminUserId}",
+          "roles": [
+            "admin"
+          ]
         }
       }
     }
