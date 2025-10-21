@@ -7,7 +7,9 @@
     "bffClientSecret": "2274075d-3358-4f59-a13a-ddf4c6906b1e",
     "bffUrl": "http://localhost:3118",
     "limsUiUrl": "http://localhost:4667",
-    "fusionAuthApplicationId": "3c219e58-ed0e-4b18-ad48-f4f92793ae32"
+    "fusionAuthApplicationId": "3c219e58-ed0e-4b18-ad48-f4f92793ae32",
+    "testApiApplicationId": "a1b2c3d4-e5f6-4a5b-9c8d-7e6f5a4b3c2d",
+    "testApiAudience": "test-api"
   },
   "apiKeys": [
     {
@@ -135,6 +137,60 @@
           "roles": [
             "admin"
           ]
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/application/#{testApiApplicationId}",
+      "body": {
+        "application": {
+          "id": "#{testApiApplicationId}",
+          "name": "Test API",
+          "active": true,
+          "jwtConfiguration": {
+            "enabled": true,
+            "refreshTokenTimeToLiveInMinutes": 43200,
+            "timeToLiveInSeconds": 3600,
+            "accessTokenKeyId": null
+          },
+          "loginConfiguration": {
+            "allowTokenRefresh": false,
+            "generateRefreshTokens": false,
+            "requireAuthentication": true
+          },
+          "oauthConfiguration": {
+            "clientAuthenticationPolicy": "NotRequired",
+            "proofKeyForCodeExchangePolicy": "NotRequired",
+            "authorizedRedirectURLs": [],
+            "authorizedOriginURLs": [],
+            "enabledGrants": [],
+            "generateRefreshTokens": false,
+            "requireRegistration": false
+          },
+          "roles": []
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user/registration/#{adminUserId}",
+      "body": {
+        "registration": {
+          "applicationId": "#{testApiApplicationId}",
+          "userId": "#{adminUserId}",
+          "roles": []
+        }
+      }
+    },
+    {
+      "method": "POST",
+      "url": "/api/user/registration/#{testUserId}",
+      "body": {
+        "registration": {
+          "applicationId": "#{testApiApplicationId}",
+          "userId": "#{testUserId}",
+          "roles": []
         }
       }
     }
