@@ -67,7 +67,7 @@ export function login(returnUrl?: string) {
         : undefined;
     })();
 
-  const url = new URL(`${BFF_BASE_URL}/login`);
+  const url = new URL(`${BFF_BASE_URL}/bff/login`);
   if (finalReturnUrl) {
     url.searchParams.set("returnUrl", finalReturnUrl);
   }
@@ -75,7 +75,7 @@ export function login(returnUrl?: string) {
 }
 
 export function logout(returnUrl?: string) {
-  const url = new URL(`${BFF_BASE_URL}/logout`);
+  const url = new URL(`${BFF_BASE_URL}/bff/logout`);
   if (returnUrl) {
     url.searchParams.set("returnUrl", returnUrl);
   }
