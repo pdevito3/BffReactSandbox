@@ -1,0 +1,56 @@
+# Authgear Configuration File
+# Generated from authgear init and customized for BespokeBFF
+
+# Application ID
+id: bespokebff
+
+# HTTP configuration
+http:
+  public_origin: "http://localhost:3000"
+
+# OAuth/OIDC configuration
+oauth:
+  clients:
+    # BFF Application Client
+    - name: "BFF Application"
+      client_id: "bff-client"
+      # Issue JWT access tokens
+      issue_jwt_access_token: true
+      # Application type
+      x_application_type: traditional_webapp
+      # Redirect URIs where users are sent after authentication
+      redirect_uris:
+        - "http://localhost:3118/signin-oidc"
+        - "https://localhost:3118/signin-oidc"
+        - "http://localhost:4667/"
+      # Post logout redirect URIs
+      post_logout_redirect_uris:
+        - "http://localhost:3118/signout-callback-oidc"
+        - "https://localhost:3118/signout-callback-oidc"
+        - "http://localhost:4667/"
+
+# Authenticator configuration
+authenticator:
+  # Out-of-band OTP (email/SMS)
+  oob_otp:
+    sms:
+      # Phone OTP mode
+      phone_otp_mode: sms
+
+# Verification configuration
+verification:
+  claims:
+    email:
+      # Email verification is enabled
+      enabled: true
+      # Not required for development - can be changed in production
+      required: false
+
+# UI configuration
+ui:
+  # Enable signup/login flow
+  signup_login_flow_enabled: true
+
+# Search configuration - using none for simplicity
+search:
+  implementation: none

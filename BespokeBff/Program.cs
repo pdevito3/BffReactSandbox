@@ -56,11 +56,11 @@ try
     })
     .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
-        var fusionAuthConfig = builder.Configuration.GetSection("FusionAuth");
-        
-        options.Authority = fusionAuthConfig["Authority"];
-        options.ClientId = fusionAuthConfig["ClientId"];
-        options.ClientSecret = fusionAuthConfig["ClientSecret"];
+        var authgearConfig = builder.Configuration.GetSection("Authgear");
+
+        options.Authority = authgearConfig["Authority"];
+        options.ClientId = authgearConfig["ClientId"];
+        options.ClientSecret = authgearConfig["ClientSecret"];
         options.ResponseType = "code";
         
         options.Scope.Clear();
@@ -81,6 +81,43 @@ try
                 {
                     context.Response.Redirect("/bff/login");
                     context.HandleResponse();
+                }
+
+                return Task.CompletedTask;
+            },
+            OnTicketReceived = (context) =>
+            {
+                // After successful authentication, retrieve the returnUrl from Items
+                context.Properties.Items.TryGetValue("returnUrl", out var returnUrl);
+
+                Log.Information("OnTicketReceived: returnUrl from Items = {ReturnUrl}", returnUrl);
+
+                if (string.IsNullOrEmpty(returnUrl)) 
+                    return Task.CompletedTask;
+                
+                // Validate the return URL is from an allowed origin
+                var allowedOrigins = new[]
+                {
+                    "http://localhost:4667",
+                    "https://localhost:4667"
+                };
+
+                // If it's a full URL from an allowed origin, set it as the redirect
+                if (!Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri)) 
+                    return Task.CompletedTask;
+                    
+                var origin = $"{uri.Scheme}://{uri.Host}:{uri.Port}";
+                Log.Information("OnTicketReceived: Checking origin {Origin} against allowed origins", origin);
+
+                if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+                {
+                    Log.Information("OnTicketReceived: Setting RedirectUri to {ReturnUrl}", returnUrl);
+                    // Set RedirectUri and let the normal flow complete (sign in cookie, THEN redirect)
+                    context.Properties.RedirectUri = returnUrl;
+                }
+                else
+                {
+                    Log.Warning("OnTicketReceived: Origin {Origin} not in allowed origins", origin);
                 }
 
                 return Task.CompletedTask;

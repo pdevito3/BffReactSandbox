@@ -19,16 +19,14 @@ export function getLoginUrl(returnUrl?: string) {
  * Redirect to login, preserving the current route
  */
 function login() {
-  // Capture the full current path including search params and hash
-  const currentPath =
-    window.location.pathname + window.location.search + window.location.hash;
+  // Capture the full current URL to return to after login
+  const currentUrl = window.location.href;
 
-  // Only preserve the path if we're not already on the login page
+  // Only preserve the URL if we're not already on a login-related page
   // This prevents redirect loops
-  const returnUrl =
-    !currentPath.startsWith("/login") && currentPath !== "/"
-      ? currentPath
-      : undefined;
+  const returnUrl = !window.location.pathname.startsWith("/login")
+    ? currentUrl
+    : undefined;
 
   window.location.href = getLoginUrl(returnUrl);
 }

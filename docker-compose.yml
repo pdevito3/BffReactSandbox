@@ -1,13 +1,13 @@
 services:
-  # PostgreSQL database for FusionAuth
+  # PostgreSQL database for Authgear with pg_partman extension
   db:
-    image: postgres:16.0-bookworm
+    image: postgres:16-bookworm
     environment:
-      PGDATA: /var/lib/postgresql/data/pgdata
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -16,66 +16,63 @@ services:
       - "5433:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./postgres/init-pg-partman.sh:/docker-entrypoint-initdb.d/init-pg-partman.sh
+    networks:
+      - authgear-network
 
-  # FusionAuth identity provider
-  fusionauth:
-    image: fusionauth/fusionauth-app:latest
-    depends_on:
-      db:
-        condition: service_healthy
-      search:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: jdbc:postgresql://db:5432/fusionauth
-      DATABASE_ROOT_USERNAME: ${POSTGRES_USER}
-      DATABASE_ROOT_PASSWORD: ${POSTGRES_PASSWORD}
-      DATABASE_USERNAME: ${DATABASE_USER}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
-      FUSIONAUTH_APP_KICKSTART_FILE: ${FUSIONAUTH_APP_KICKSTART_FILE}
-      FUSIONAUTH_APP_MEMORY: ${FUSIONAUTH_APP_MEMORY}
-      FUSIONAUTH_APP_RUNTIME_MODE: ${FUSIONAUTH_APP_RUNTIME_MODE}
-      FUSIONAUTH_APP_URL: http://localhost:9011
-      SEARCH_SERVERS: http://search:9200
-      SEARCH_TYPE: ${FUSIONAUTH_SEARCH_TYPE}
+  # Redis for Authgear session storage and caching
+  redis:
+    image: redis:7-alpine
     healthcheck:
-      test: curl --silent --fail http://localhost:9011/api/status -o /dev/null -w "%{http_code}"
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     ports:
-      - "9011:9011"
+      - "6379:6379"
     volumes:
-      - fusionauth_config:/usr/local/fusionauth/config
-      - ${FUSIONAUTH_LOCAL_KICKSTART_DIRECTORY}:/usr/local/fusionauth/kickstart
-      - ${FUSIONAUTH_LOCAL_PLUGIN_DIRECTORY}:/usr/local/fusionauth/plugins
+      - redis_data:/data
+    networks:
+      - authgear-network
 
-  # OpenSearch for FusionAuth search capabilities
-  search:
-    image: opensearchproject/opensearch:2.11.0
+  # Authgear identity provider
+  authgear:
+    image: quay.io/theauthgear/authgear-server:latest
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      cluster.name: fusionauth
-      discovery.type: single-node
-      node.name: search
-      plugins.security.disabled: true
-      bootstrap.memory_lock: true
-      OPENSEARCH_JAVA_OPTS: ${OPENSEARCH_JAVA_OPTS}
+      DEV_MODE: "true"
+      LOG_LEVEL: debug
+      DATABASE_SCHEMA: public
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable"
+      AUDIT_DATABASE_SCHEMA: public
+      AUDIT_DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable"
+      IMAGES_DATABASE_SCHEMA: public
+      IMAGES_DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable"
+      REDIS_URL: "redis://redis:6379"
+      ANALYTIC_REDIS_URL: "redis://redis:6379"
     healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/healthz"]
       interval: 10s
-      retries: 80
-      test: curl --write-out 'HTTP %{http_code}' --fail --silent --output /dev/null http://localhost:9200/
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
+    ports:
+      - "3000:3000"
     volumes:
-      - search_data:/usr/share/opensearch/data
+      - ./authgear/authgear.yaml:/app/authgear.yaml
+      - ./authgear/authgear.secrets.yaml:/app/authgear.secrets.yaml
+    networks:
+      - authgear-network
 
 volumes:
   db_data:
-  fusionauth_config:
-  search_data:
+  redis_data:
+
+networks:
+  authgear-network:
+    driver: bridge
