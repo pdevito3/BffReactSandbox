@@ -11,11 +11,14 @@ export interface TokenInfo {
 
 export interface User {
   isAuthenticated: boolean
+  name?: string
+  email?: string
+  initials?: string
+  tokenInfo?: TokenInfo
   claims?: Array<{
     type: string
     value: string
   }>
-  tokenInfo?: TokenInfo
 }
 
 export interface AuthStatus {
@@ -91,63 +94,6 @@ const authKeys = {
   status: () => [...authKeys.all, 'status'] as const,
 }
 
-// Helper function to get claim value by type
-function getClaimValue(user?: User | null, claimType: string): string | undefined {
-  return user?.claims?.find(claim => claim.type === claimType)?.value
-}
-
-// Helper function to get user name from claims
-function getUserName(user?: User | null): string | undefined {
-  const firstName = getClaimValue(user, 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname')
-  const lastName = getClaimValue(user, 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname')
-  
-  if (firstName || lastName) {
-    return [firstName, lastName].filter(Boolean).join(' ')
-  }
-  
-  // Fallback to other name claims
-  const nameClaim = getClaimValue(user, 'name') || 
-                   getClaimValue(user, 'given_name') ||
-                   getClaimValue(user, 'family_name') ||
-                   getClaimValue(user, 'preferred_username') ||
-                   getClaimValue(user, 'nickname')
-  
-  return nameClaim
-}
-
-// Helper function to get user email from claims
-function getUserEmail(user?: User | null): string | undefined {
-  // Try standard email claims and full claim URLs
-  return getClaimValue(user, 'email') || 
-         getClaimValue(user, 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress') ||
-         getClaimValue(user, 'email_verified')
-}
-
-// Helper function to get user initials
-function getUserInitials(user?: User | null): string {
-  if (!user) return 'U'
-  
-  const name = getUserName(user)
-  const email = getUserEmail(user)
-  
-  // Try to get initials from name first
-  if (name) {
-    const nameParts = name.trim().split(/\s+/)
-    if (nameParts.length === 1) {
-      return nameParts[0].substring(0, 2).toUpperCase()
-    }
-    return nameParts.map(part => part[0]).join('').substring(0, 2).toUpperCase()
-  }
-  
-  // Fallback to email initials
-  if (email) {
-    const emailParts = email.split('@')[0]
-    return emailParts.substring(0, 2).toUpperCase()
-  }
-  
-  return 'U' // Ultimate fallback
-}
-
 // Main auth hook
 export function useAuth() {
   const queryClient = useQueryClient()
@@ -191,18 +137,14 @@ export function useAuth() {
     },
   })
 
-  const userInitials = getUserInitials(user)
-  const userName = getUserName(user)
-  const userEmail = getUserEmail(user)
-
   return {
     user,
     loading,
     error: error?.message ?? null,
     isAuthenticated: user?.isAuthenticated ?? false,
-    userInitials,
-    userName,
-    userEmail,
+    userInitials: user?.initials ?? 'U',
+    userName: user?.name,
+    userEmail: user?.email,
     refetch: refreshAuth,
     invalidateAuth,
     refreshTokens: refreshTokensMutation,

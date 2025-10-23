@@ -37,7 +37,16 @@ if (rootElement && !rootElement.innerHTML) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        <ReactQueryDevtools buttonPosition="bottom-right" />
+        <div
+          style={{
+            position: "fixed",
+            bottom: "50px",
+            right: "20px",
+            zIndex: 99999,
+          }}
+        >
+          <ReactQueryDevtools buttonPosition="relative" initialIsOpen={false} />
+        </div>
       </QueryClientProvider>
     </StrictMode>
   );
