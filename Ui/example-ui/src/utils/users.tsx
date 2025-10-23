@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { notFound } from '@tanstack/react-router'
-import axios from 'redaxios'
+import axios from 'axios'
 
 export type User = {
   id: number

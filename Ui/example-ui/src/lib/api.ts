@@ -1,133 +1,108 @@
+import axios from "axios";
+import { Notification } from "./notification";
+
 // API utilities with CSRF protection
 export const BFF_BASE_URL = "http://localhost:3118";
 
-// CSRF header configuration
-const CSRF_HEADER_NAME = "X-CSRF";
-const CSRF_HEADER_VALUE = "1";
-
-// HTTP methods that require CSRF protection
-const STATEFUL_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-
 /**
- * Enhanced fetch wrapper that automatically includes CSRF headers for state-changing requests
+ * Get the login URL with optional return URL
  */
-export async function apiFetch(
-  url: string,
-  options: RequestInit = {}
-): Promise<Response> {
-  const method = options.method?.toUpperCase() || "GET";
-
-  // Prepare headers
-  const headers = new Headers(options.headers || {});
-
-  // Always include credentials for session cookies
-  const fetchOptions: RequestInit = {
-    ...options,
-    credentials: "include",
-    headers,
-  };
-
-  // Add CSRF header for state-changing requests
-  if (STATEFUL_METHODS.has(method)) {
-    headers.set(CSRF_HEADER_NAME, CSRF_HEADER_VALUE);
+export function getLoginUrl(returnUrl?: string) {
+  const url = new URL("/bff/login", BFF_BASE_URL);
+  if (returnUrl) {
+    url.searchParams.set("returnUrl", returnUrl);
   }
-
-  // Add Content-Type if not already set and has body
-  if (options.body && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  return fetch(url, fetchOptions);
+  return url.toString();
 }
 
 /**
- * Helper for making GET requests to BFF endpoints
+ * Redirect to login, preserving the current route
  */
-export async function bffGet<T>(endpoint: string): Promise<T> {
-  const response = await apiFetch(`${BFF_BASE_URL}${endpoint}`);
+function login() {
+  // Capture the full current path including search params and hash
+  const currentPath =
+    window.location.pathname + window.location.search + window.location.hash;
 
-  if (!response.ok) {
-    throw new Error(
-      `GET ${endpoint} failed: ${response.status} ${response.statusText}`
-    );
-  }
+  // Only preserve the path if we're not already on the login page
+  // This prevents redirect loops
+  const returnUrl =
+    !currentPath.startsWith("/login") && currentPath !== "/"
+      ? currentPath
+      : undefined;
 
-  return response.json();
+  window.location.href = getLoginUrl(returnUrl);
 }
 
 /**
- * Helper for making POST requests to BFF endpoints
+ * BFF axios instance
  */
-export async function bffPost<T>(endpoint: string, body?: any): Promise<T> {
-  const response = await apiFetch(`${BFF_BASE_URL}${endpoint}`, {
-    method: "POST",
-    body: body ? JSON.stringify(body) : undefined,
-  });
+export const myAppBff = axios.create({
+  baseURL: BFF_BASE_URL + "/bff",
+  headers: {
+    "X-CSRF": "1",
+  },
+  withCredentials: true,
+});
 
-  if (!response.ok) {
-    throw new Error(
-      `POST ${endpoint} failed: ${response.status} ${response.statusText}`
-    );
+/**
+ * API axios instance (if you have direct API calls)
+ */
+export const myAppApi = axios.create({
+  baseURL: BFF_BASE_URL + "/api",
+  headers: {
+    "X-CSRF": "1",
+  },
+  withCredentials: true,
+});
+
+/**
+ * Common error handler for all API responses
+ */
+function commonRejection(error: any) {
+  // Handle 401 Unauthorized - redirect to login
+  if (error?.response?.status === 401) {
+    login();
+    return;
   }
 
-  return response.json();
+  // Extract error details
+  const statusCode = error?.response?.status;
+  const detailMessage =
+    error?.response?.data?.detail ||
+    error?.response?.data?.message ||
+    "An unknown error occurred.";
+
+  // Show notifications for specific error codes
+  if (statusCode === 422 || statusCode === 400 || statusCode === 500) {
+    Notification.error(`${detailMessage}`);
+  }
+
+  // Always throw the error so calling code can handle it
+  throw error;
 }
 
 /**
- * Helper for making PUT requests to BFF endpoints
+ * Response interceptor for BFF
  */
-export async function bffPut<T>(endpoint: string, body?: any): Promise<T> {
-  const response = await apiFetch(`${BFF_BASE_URL}${endpoint}`, {
-    method: "PUT",
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `PUT ${endpoint} failed: ${response.status} ${response.statusText}`
-    );
+myAppBff.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    commonRejection(error);
   }
-
-  return response.json();
-}
+);
 
 /**
- * Helper for making PATCH requests to BFF endpoints
+ * Response interceptor for API
  */
-export async function bffPatch<T>(endpoint: string, body?: any): Promise<T> {
-  const response = await apiFetch(`${BFF_BASE_URL}${endpoint}`, {
-    method: "PATCH",
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `PATCH ${endpoint} failed: ${response.status} ${response.statusText}`
-    );
+myAppApi.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    commonRejection(error);
   }
-
-  return response.json();
-}
+);
 
 /**
- * Helper for making DELETE requests to BFF endpoints
- */
-export async function bffDelete<T>(endpoint: string): Promise<T> {
-  const response = await apiFetch(`${BFF_BASE_URL}${endpoint}`, {
-    method: "DELETE",
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `DELETE ${endpoint} failed: ${response.status} ${response.statusText}`
-    );
-  }
-
-  return response.json();
-}
-
-/**
- * Generic API error handling utility
+ * Generic API error class
  */
 export class ApiError extends Error {
   constructor(
@@ -137,35 +112,5 @@ export class ApiError extends Error {
   ) {
     super(message);
     this.name = "ApiError";
-  }
-}
-
-/**
- * Enhanced fetch that throws structured errors
- */
-export async function fetchJson<T>(
-  url: string,
-  options?: RequestInit
-): Promise<T> {
-  try {
-    const response = await apiFetch(url, options);
-
-    if (!response.ok) {
-      throw new ApiError(
-        response.status,
-        response.statusText,
-        `Request failed: ${response.status} ${response.statusText}`
-      );
-    }
-
-    return await response.json();
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-
-    throw new Error(
-      `Network error: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
   }
 }
