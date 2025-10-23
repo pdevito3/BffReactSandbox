@@ -92,32 +92,22 @@ try
 
                 Log.Information("OnTicketReceived: returnUrl from Items = {ReturnUrl}", returnUrl);
 
-                if (string.IsNullOrEmpty(returnUrl)) 
+                if (string.IsNullOrEmpty(returnUrl))
                     return Task.CompletedTask;
-                
-                // Validate the return URL is from an allowed origin
-                var allowedOrigins = new[]
-                {
-                    "http://localhost:4667",
-                    "https://localhost:4667"
-                };
 
-                // If it's a full URL from an allowed origin, set it as the redirect
-                if (!Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri)) 
-                    return Task.CompletedTask;
-                    
-                var origin = $"{uri.Scheme}://{uri.Host}:{uri.Port}";
-                Log.Information("OnTicketReceived: Checking origin {Origin} against allowed origins", origin);
-
-                if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+                // Instead of trying to set an external URL directly (which OIDC middleware ignores),
+                // redirect to our callback endpoint which will handle the external redirect
+                // after the cookie is already signed in
+                if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var _))
                 {
-                    Log.Information("OnTicketReceived: Setting RedirectUri to {ReturnUrl}", returnUrl);
-                    // Set RedirectUri and let the normal flow complete (sign in cookie, THEN redirect)
-                    context.Properties.RedirectUri = returnUrl;
+                    Log.Information("OnTicketReceived: Redirecting to /bff/callback to handle external URL");
+                    context.Properties.RedirectUri = "/bff/callback";
                 }
-                else
+                else if (returnUrl.StartsWith('/'))
                 {
-                    Log.Warning("OnTicketReceived: Origin {Origin} not in allowed origins", origin);
+                    // For relative URLs, we can set them directly
+                    Log.Information("OnTicketReceived: Setting RedirectUri to relative URL {ReturnUrl}", returnUrl);
+                    context.Properties.RedirectUri = returnUrl;
                 }
 
                 return Task.CompletedTask;
