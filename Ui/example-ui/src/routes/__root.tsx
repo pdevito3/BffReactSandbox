@@ -157,9 +157,9 @@ function ResponsiveSidebar() {
 
 function RootComponent() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="example-theme">
+    <ThemeProvider defaultTheme="system" storageKey="theme">
       <ResponsiveSidebar />
-      <TanStackRouterDevtools position="bottom-left" />
+      <TanStackRouterDevtools position="bottom-right" />
     </ThemeProvider>
   );
 }

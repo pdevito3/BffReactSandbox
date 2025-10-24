@@ -122,36 +122,43 @@ const user = await getCurrentUser() // Full user object or null
 
 ### API Configuration
 
-All API calls use the enhanced `api.ts` utilities that automatically handle:
-- Session cookies via `credentials: 'include'`  
-- CSRF protection via `X-CSRF: 1` header for state-changing requests
-- Proper error handling and type safety
+All API calls use axios instances that automatically handle:
+- Session cookies via `withCredentials: true`
+- CSRF protection via `X-CSRF: 1` header
+- 401 redirects to login with route preservation
+- Error notifications for 400/422/500 status codes
 
 ```typescript
-// src/lib/api.ts - Enhanced fetch with CSRF protection
-import { bffGet, bffPost, bffPut, bffDelete } from '~/lib/api'
+// src/lib/api.ts - Axios instances with interceptors
+import { myAppBff, myAppApi } from '~/lib/api'
 
-// GET request (no CSRF header needed)
-const user = await bffGet<User>('/bff/user')
+// GET request to BFF
+const response = await myAppBff.get<User>('/user')
+const user = response.data
 
-// POST request (automatically includes X-CSRF: 1 header)
-const result = await bffPost<RefreshResult>('/bff/refresh')
+// POST request to BFF (automatically includes X-CSRF: 1 header)
+const response = await myAppBff.post<RefreshResult>('/refresh')
+const result = response.data
 
-// PUT/PATCH/DELETE also automatically include CSRF headers
-const updated = await bffPut<User>('/bff/user', userData)
+// PUT/DELETE also automatically include CSRF headers
+await myAppBff.put('/user', userData)
+await myAppBff.delete('/session')
+
+// Direct API calls (if needed)
+const apiResponse = await myAppApi.get('/data')
 ```
 
-#### Manual Fetch with CSRF
-For custom requests, use the `apiFetch` wrapper:
+#### Response Interceptors
+
+All responses are automatically processed through interceptors that:
+- Redirect to login on 401 (preserving the current route)
+- Show error notifications for common error codes
+- Re-throw errors for custom handling
 
 ```typescript
-import { apiFetch } from '~/lib/api'
-
-const response = await apiFetch('/bff/custom-endpoint', {
-  method: 'POST',
-  body: JSON.stringify({ data: 'example' })
-})
-// X-CSRF: 1 header automatically added for POST requests
+// This happens automatically - no code needed
+// On 401: redirects to /bff/login?returnUrl=/current/path
+// On 400/422/500: shows notification with error message
 ```
 
 ## State Management
@@ -362,33 +369,41 @@ The UI includes a CSRF demo component that lets you test the protection:
 
 ```typescript
 // src/lib/api.ts
-const CSRF_HEADER_NAME = 'X-CSRF'
-const CSRF_HEADER_VALUE = '1'
-const STATEFUL_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+import axios from "axios";
 
-export async function apiFetch(url: string, options: RequestInit = {}) {
-  const method = options.method?.toUpperCase() || 'GET'
-  const headers = new Headers(options.headers || {})
-  
-  // Add CSRF header for state-changing requests
-  if (STATEFUL_METHODS.has(method)) {
-    headers.set(CSRF_HEADER_NAME, CSRF_HEADER_VALUE)
+// BFF axios instance with CSRF headers
+export const myAppBff = axios.create({
+  baseURL: BFF_BASE_URL + "/bff",
+  headers: {
+    "X-CSRF": "1",  // CSRF protection for all requests
+  },
+  withCredentials: true,  // Include session cookies
+});
+
+// Response interceptor handles errors automatically
+myAppBff.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error?.response?.status === 401) {
+      // Redirect to login with current route preserved
+      login();
+    }
+    throw error;
   }
-  
-  return fetch(url, { ...options, credentials: 'include', headers })
-}
+);
 ```
 
 ### Custom API Integration
 
-When integrating with other APIs through the BFF, ensure they also support CSRF protection:
+When integrating with other APIs through the BFF, use the axios instances:
 
 ```typescript
 // Example: API proxy endpoint that forwards CSRF-protected requests
-const apiData = await bffPost('/api/proxy/external-service', {
+const response = await myAppBff.post('/api/proxy/external-service', {
   action: 'update',
   data: payload
-})
+});
+const apiData = response.data;
 ```
 
 ## Production Considerations
