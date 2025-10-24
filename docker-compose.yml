@@ -48,7 +48,6 @@ services:
     volumes:
       - fusionauth_config:/usr/local/fusionauth/config
       - ${FUSIONAUTH_LOCAL_KICKSTART_DIRECTORY}:/usr/local/fusionauth/kickstart
-      - ${FUSIONAUTH_LOCAL_PLUGIN_DIRECTORY}:/usr/local/fusionauth/plugins
 
   # OpenSearch for FusionAuth search capabilities
   search:
