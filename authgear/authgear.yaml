@@ -14,7 +14,7 @@ oauth:
     # BFF Application Client
     - name: "BFF Application"
       client_id: "bff-client"
-      # Issue JWT access tokens
+      # Issue JWT access tokens (this will be used to call the API)
       issue_jwt_access_token: true
       # Application type
       x_application_type: traditional_webapp

@@ -54,6 +54,10 @@ const data = {
       url: "#",
       items: [
         {
+          title: "API Test",
+          url: "/api-test",
+        },
+        {
           title: "Pathless Layout",
           url: "/route-a",
         },
