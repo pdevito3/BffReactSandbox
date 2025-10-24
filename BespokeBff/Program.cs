@@ -7,6 +7,7 @@ using Serilog;
 using System.Security.Claims;
 using BespokeBff.Middleware;
 using BespokeBff.Endpoints;
+using BespokeBff.Configuration;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -22,6 +23,9 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
         .WriteTo.Console());
+
+    // Configure BFF options
+    builder.Services.Configure<BffOptions>(builder.Configuration.GetSection(BffOptions.SectionName));
 
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
@@ -95,9 +99,8 @@ try
                 if (string.IsNullOrEmpty(returnUrl))
                     return Task.CompletedTask;
 
-                // Instead of trying to set an external URL directly (which OIDC middleware ignores),
-                // redirect to our callback endpoint which will handle the external redirect
-                // after the cookie is already signed in
+                // For absolute URLs (external redirects), use the callback endpoint
+                // which will handle validation and redirection after cookie is signed in
                 if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var _))
                 {
                     Log.Information("OnTicketReceived: Redirecting to /bff/callback to handle external URL");
@@ -159,7 +162,10 @@ try
     {
         options.AddDefaultPolicy(policy =>
         {
-            policy.WithOrigins("http://localhost:4667", "https://localhost:4667")
+            var bffOptions = builder.Configuration.GetSection(BffOptions.SectionName).Get<BffOptions>();
+            var allowedOrigins = bffOptions?.AllowedOrigins ?? [];
+
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials();

@@ -1,23 +1,22 @@
 namespace BespokeBff.Endpoints.BFF;
 
+using BespokeBff.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Options;
 using Serilog;
 
 public static class Login
 {
-    private static readonly string[] AllowedOrigins =
-    [
-        "http://localhost:4667",
-        "https://localhost:4667"
-    ];
-
-    public static IResult Handle(HttpContext context, string? returnUrl)
+    public static IResult Handle(
+        HttpContext context,
+        string? returnUrl,
+        IOptions<BffOptions> bffOptions)
     {
         Log.Information("Login endpoint called with returnUrl: {ReturnUrl}", returnUrl);
 
         // Validate and sanitize the return URL
-        var finalReturnUrl = ValidateReturnUrl(returnUrl);
+        var finalReturnUrl = ValidateReturnUrl(returnUrl, bffOptions.Value.AllowedOrigins);
 
         Log.Information("Login endpoint validated returnUrl as: {FinalReturnUrl}", finalReturnUrl);
 
@@ -32,7 +31,7 @@ public static class Login
         return Results.Challenge(props, [OpenIdConnectDefaults.AuthenticationScheme]);
     }
 
-    private static string ValidateReturnUrl(string? returnUrl)
+    private static string ValidateReturnUrl(string? returnUrl, string[] allowedOrigins)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))
         {
@@ -49,7 +48,7 @@ public static class Login
         if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
         {
             var origin = $"{uri.Scheme}://{uri.Host}:{uri.Port}";
-            if (AllowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+            if (allowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
             {
                 return returnUrl;
             }
