@@ -18,8 +18,8 @@ export const Route = createFileRoute('/posts/$postId')({
     meta: loaderData ? [{ title: loaderData.title }] : undefined,
   }),
   errorComponent: PostErrorComponent,
-  notFoundComponent: () => {
-    return <NotFound>Post not found</NotFound>
+  notFoundComponent: (props) => {
+    return <NotFound {...props}>Post not found</NotFound>
   },
   component: PostComponent,
 })

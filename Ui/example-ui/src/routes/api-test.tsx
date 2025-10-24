@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { bffPost } from "~/lib/api";
+import { myAppApi } from "~/lib/api";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -31,13 +31,15 @@ function ApiTest() {
 
   const publicMutation = useMutation({
     mutationFn: async (name: string) => {
-      return bffPost<PublicResponse>("/api/public", { name });
+      const response = await myAppApi.post<PublicResponse>("/public", { name });
+      return response.data;
     },
   });
 
   const secureMutation = useMutation({
     mutationFn: async ({ name, data }: { name: string; data: string }) => {
-      return bffPost<SecureResponse>("/api/secure", { name, data });
+      const response = await myAppApi.post<SecureResponse>("/secure", { name, data });
+      return response.data;
     },
   });
 

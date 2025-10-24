@@ -37,10 +37,7 @@ export function FilterBadge({ filter, onRemove, onEdit }: FilterBadgeProps) {
       <span className="max-w-[200px] truncate">{formattedValue}</span>
 
       {filter.controlType === "text" && isCaseSensitive && (
-        <CaseSensitive
-          className="h-3 w-3 text-muted-foreground ml-1"
-          title="Case Sensitive"
-        />
+        <CaseSensitive className="h-3 w-3 text-muted-foreground ml-1" />
       )}
 
       <Button

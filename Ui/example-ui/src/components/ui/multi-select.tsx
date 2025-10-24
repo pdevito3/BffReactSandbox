@@ -2,7 +2,7 @@ import * as React from "react"
 import { ChevronDown, X, Check } from "lucide-react"
 import { useAutoComplete } from "@wispe/wispe-react"
 
-import { cn } from "@/lib/utils"
+import { cn } from "~/lib/utils"
 import { Badge } from "./badge"
 
 interface MultiSelectItem {
