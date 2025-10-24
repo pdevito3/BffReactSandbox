@@ -21,13 +21,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             ValidateIssuer = true,
             ValidIssuer = authgearConfig["ValidIssuer"],
-            ValidateAudience = false, // Authgear doesn't set custom audience by default
+            // Authgear sets aud to the Authgear endpoint
+            ValidateAudience = true,
+            ValidAudience = authgearConfig["ValidIssuer"], // Same as issuer for Authgear
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(5)
         };
     });
 
-builder.Services.AddAuthorization();
+// Add authorization with client_id policy for API-specific access control
+builder.Services.AddAuthorization(options =>
+{
+    // Policy: Only allow tokens issued to the BFF client
+    options.AddPolicy("BffClientOnly", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.RequireClaim("client_id", "bff-client");
+    });
+});
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -65,22 +76,24 @@ app.MapGet("/health", () => new
     .WithName("Health")
     .AllowAnonymous();
 
-// Protected endpoint - requires authentication
-app.MapGet("/data", [Authorize] (HttpContext context) =>
+// Protected endpoint - requires JWT validation + client_id check
+app.MapGet("/data", (HttpContext context) =>
     {
         var user = context.User;
         var userId = user.FindFirst("sub")?.Value ?? "unknown";
         var email = user.FindFirst("email")?.Value ?? "unknown";
 
-        // Check for audience claim
+        // Extract key claims for debugging
         var audience = user.FindFirst("aud")?.Value;
         var clientId = user.FindFirst("client_id")?.Value;
+        var issuer = user.FindFirst("iss")?.Value;
 
         return new
         {
-            Message = "This is protected data from the API",
+            Message = "✅ Protected data - Full JWT validation passed (iss, aud, lifetime, client_id)",
             UserId = userId,
             Email = email,
+            Issuer = issuer,
             Audience = audience,
             ClientId = clientId,
             Timestamp = DateTime.UtcNow,
@@ -88,7 +101,7 @@ app.MapGet("/data", [Authorize] (HttpContext context) =>
         };
     })
     .WithName("GetProtectedData")
-    .RequireAuthorization();
+    .RequireAuthorization("BffClientOnly"); // Enforces both JWT validation AND client_id check
 
 var summaries = new[]
 {
