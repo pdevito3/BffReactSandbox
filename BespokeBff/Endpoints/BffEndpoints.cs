@@ -11,6 +11,7 @@ public static class BffEndpoints
 
         bff.MapGet("/login", Login.Handle);
         bff.MapGet("/logout", Logout.Handle);
+        bff.MapGet("/callback", (Delegate)AuthCallback.Handle);
         bff.MapGet("/user", (Delegate)GetUser.Handle).RequireAuthorization();
         bff.MapPost("/refresh", (Delegate)RefreshToken.Handle).RequireAuthorization();
         bff.MapGet("/status", GetAuthStatus.Handle);

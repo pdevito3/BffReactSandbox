@@ -53,19 +53,8 @@ async function fetchCurrentUser(): Promise<User | null> {
 
 // Authentication actions
 export function login(returnUrl?: string) {
-  // If no returnUrl provided, capture the current route
-  const finalReturnUrl =
-    returnUrl ||
-    (() => {
-      const currentPath =
-        window.location.pathname +
-        window.location.search +
-        window.location.hash;
-      // Only preserve the path if we're not already on the login page
-      return !currentPath.startsWith("/login") && currentPath !== "/"
-        ? currentPath
-        : undefined;
-    })();
+  // If no returnUrl provided, capture the current full URL
+  const finalReturnUrl = returnUrl || window.location.href;
 
   const url = new URL(`${BFF_BASE_URL}/bff/login`);
   if (finalReturnUrl) {

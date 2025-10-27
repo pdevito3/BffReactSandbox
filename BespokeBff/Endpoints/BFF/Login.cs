@@ -11,6 +11,13 @@ public static class Login
         {
             RedirectUri = returnUrl ?? "/"
         };
+
+        // Store returnUrl in Items so we can access it in OnTicketReceived
+        if (!string.IsNullOrEmpty(returnUrl))
+        {
+            props.Items["returnUrl"] = returnUrl;
+        }
+
         return Results.Challenge(props, [OpenIdConnectDefaults.AuthenticationScheme]);
     }
 }

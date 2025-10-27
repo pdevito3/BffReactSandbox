@@ -117,7 +117,8 @@ public class CsrfOptions
     public List<string> ExcludedPaths { get; set; } = new()
     {
         "/bff/login",
-        "/bff/logout", 
+        "/bff/logout",
+        "/bff/callback",
         "/signin-oidc",
         "/signout-callback-oidc",
         "/signout-oidc",

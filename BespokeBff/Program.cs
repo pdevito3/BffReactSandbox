@@ -75,6 +75,51 @@ try
         
         options.Events = new OpenIdConnectEvents
         {
+            OnTicketReceived = (context) =>
+            {
+                // Read returnUrl from Items (stored by Login endpoint)
+                context.Properties.Items.TryGetValue("returnUrl", out var returnUrl);
+
+                Log.Information("OnTicketReceived: returnUrl from items = {ReturnUrl}", returnUrl ?? "null");
+
+                if (string.IsNullOrEmpty(returnUrl))
+                {
+                    // No returnUrl stored, use default redirect
+                    return Task.CompletedTask;
+                }
+
+                // If it's a full URL from an allowed origin, redirect to callback endpoint
+                if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
+                {
+                    var origin = $"{uri.Scheme}://{uri.Host}:{uri.Port}";
+                    Log.Information("OnTicketReceived: Checking origin {Origin} against allowed origins", origin);
+
+                    if (BespokeBff.Configuration.BffConfiguration.AllowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
+                    {
+                        Log.Information("OnTicketReceived: Redirecting to /bff/callback to handle external URL");
+                        // Pass the returnUrl as a query parameter so it persists to the callback
+                        context.Properties.RedirectUri = $"/bff/callback?returnUrl={Uri.EscapeDataString(returnUrl)}";
+                    }
+                    else
+                    {
+                        Log.Warning("OnTicketReceived: Origin {Origin} not in allowed origins", origin);
+                        // For disallowed origins, just redirect to root
+                        context.Properties.RedirectUri = "/";
+                    }
+                }
+                else if (returnUrl.StartsWith("/"))
+                {
+                    Log.Information("OnTicketReceived: Setting RedirectUri to relative URL {ReturnUrl}", returnUrl);
+                    context.Properties.RedirectUri = returnUrl;
+                }
+                else
+                {
+                    Log.Information("OnTicketReceived: No valid returnUrl, redirecting to /");
+                    context.Properties.RedirectUri = "/";
+                }
+
+                return Task.CompletedTask;
+            },
             OnRemoteFailure = (context) =>
             {
                 if (context.Failure is AuthenticationFailureException)
@@ -130,6 +175,10 @@ try
     // Add CORS
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                          ?? new[] { "http://localhost:4667", "https://localhost:4667" };
+
+    // Initialize BFF configuration for use in endpoints and events
+    BespokeBff.Configuration.BffConfiguration.AllowedOrigins = allowedOrigins;
+
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
