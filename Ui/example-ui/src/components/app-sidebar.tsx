@@ -1,6 +1,6 @@
-import { LogOut, ChevronRight } from "lucide-react";
-import * as React from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronRight, LogOut } from "lucide-react";
+import * as React from "react";
 
 import { Link } from "@tanstack/react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -8,11 +8,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { useAuth } from "~/hooks/use-auth";
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +24,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "~/components/ui/sidebar";
+import { useAuth } from "~/hooks/use-auth";
 
 // This is sample data.
 const data = {
@@ -61,6 +59,14 @@ const data = {
           title: "Deferred",
           url: "/deferred",
         },
+        {
+          title: "API Test",
+          url: "/api-test",
+        },
+        {
+          title: "Advanced Filters",
+          url: "/filter-test",
+        },
       ],
     },
   ],
@@ -68,7 +74,7 @@ const data = {
 
 export function MobileSidebarContent() {
   const { user, userInitials, userName, userEmail, logout } = useAuth();
-  
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex flex-col gap-2 p-2">
@@ -84,17 +90,17 @@ export function MobileSidebarContent() {
         <div className="flex flex-col gap-1">
           {data.navMain.map((item, index) => {
             const [isOpen, setIsOpen] = React.useState(index === 1);
-            
+
             return (
               <div key={item.title}>
-                <button 
+                <button
                   onClick={() => setIsOpen(!isOpen)}
                   className="flex w-full items-center justify-between rounded-md p-2 text-left text-sm hover:bg-accent"
                 >
                   {item.title}
                   <motion.span
                     animate={{ rotate: isOpen ? 90 : 0 }}
-                    transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                    transition={{ type: "spring", bounce: 0, duration: 0.4 }}
                     className="flex"
                   >
                     <ChevronRight className="h-4 w-4" />
@@ -104,9 +110,9 @@ export function MobileSidebarContent() {
                   {isOpen && item.items?.length && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
+                      animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
-                      transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                      transition={{ type: "spring", bounce: 0, duration: 0.4 }}
                       className="ml-4 flex flex-col gap-1 border-l pl-4 overflow-hidden"
                     >
                       {item.items.map((subItem) => (
@@ -126,7 +132,7 @@ export function MobileSidebarContent() {
           })}
         </div>
       </div>
-      
+
       {user?.isAuthenticated && (
         <div className="border-t p-2">
           <div className="flex items-center gap-2 p-2 mb-2">
@@ -138,14 +144,14 @@ export function MobileSidebarContent() {
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-semibold">
-                {userName || 'User'}
+                {userName || "User"}
               </span>
               <span className="truncate text-xs text-muted-foreground">
-                {userEmail || ''}
+                {userEmail || ""}
               </span>
             </div>
           </div>
-          <button 
+          <button
             onClick={() => logout()}
             className="flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-accent"
           >
@@ -160,7 +166,7 @@ export function MobileSidebarContent() {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, userInitials, userName, userEmail, logout } = useAuth();
-  
+
   return (
     <Sidebar {...props}>
       <SidebarHeader>
@@ -184,14 +190,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             {data.navMain.map((item, index) => {
               const [isOpen, setIsOpen] = React.useState(index === 1);
-              
+
               return (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton onClick={() => setIsOpen(!isOpen)}>
                     {item.title}{" "}
                     <motion.span
                       animate={{ rotate: isOpen ? 90 : 0 }}
-                      transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                      transition={{ type: "spring", bounce: 0, duration: 0.4 }}
                       className="ml-auto flex"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -201,9 +207,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     {isOpen && item.items?.length && (
                       <motion.div
                         initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
+                        animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
+                        transition={{
+                          type: "spring",
+                          bounce: 0,
+                          duration: 0.4,
+                        }}
                         className="overflow-hidden"
                       >
                         <SidebarMenuSub>
@@ -243,15 +253,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </Avatar>
                     <div className="grid flex-1 text-left text-sm leading-tight">
                       <span className="truncate font-semibold">
-                        {userName || 'User'}
+                        {userName || "User"}
                       </span>
                       <span className="truncate text-xs text-muted-foreground">
-                        {userEmail || ''}
+                        {userEmail || ""}
                       </span>
                     </div>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent 
+                <DropdownMenuContent
                   className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
                   side="top"
                   align="start"

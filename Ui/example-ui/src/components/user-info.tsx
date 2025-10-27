@@ -34,7 +34,7 @@ export function UserInfo() {
 
   if (loading) {
     return (
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-4xl">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <User className="h-5 w-5" />
@@ -69,7 +69,7 @@ export function UserInfo() {
 
   if (error) {
     return (
-      <Card className="w-full max-w-2xl border-destructive">
+      <Card className="w-full max-w-4xl border-destructive">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-destructive" />
@@ -97,7 +97,7 @@ export function UserInfo() {
 
   if (!isAuthenticated || !user) {
     return (
-      <Card className="w-full max-w-2xl border-muted">
+      <Card className="w-full max-w-4xl border-muted">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <User className="h-5 w-5 text-muted-foreground" />
@@ -116,7 +116,7 @@ export function UserInfo() {
   }
 
   return (
-    <Card className="w-full max-w-2xl">
+    <Card className="w-full max-w-4xl">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
