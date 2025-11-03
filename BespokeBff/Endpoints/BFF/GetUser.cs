@@ -23,6 +23,8 @@ public static class GetUser
 
         var tokenInfo = new
         {
+            HasAccessToken = !string.IsNullOrEmpty(authResult?.Properties?.GetTokenValue("access_token")),
+            HasRefreshToken = !string.IsNullOrEmpty(authResult?.Properties?.GetTokenValue("refresh_token")),
             AccessTokenExpiresAt = authResult?.Properties?.GetTokenValue("expires_at"),
             SessionExpiresAt = authResult?.Properties?.ExpiresUtc?.ToString("O"),
             SessionIssuedAt = authResult?.Properties?.IssuedUtc?.ToString("O")

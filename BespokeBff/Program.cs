@@ -56,11 +56,11 @@ try
     })
     .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
     {
-        var fusionAuthConfig = builder.Configuration.GetSection("FusionAuth");
-        
-        options.Authority = fusionAuthConfig["Authority"];
-        options.ClientId = fusionAuthConfig["ClientId"];
-        options.ClientSecret = fusionAuthConfig["ClientSecret"];
+        var keycloakConfig = builder.Configuration.GetSection("Keycloak");
+
+        options.Authority = keycloakConfig["Authority"];
+        options.ClientId = keycloakConfig["ClientId"];
+        options.ClientSecret = keycloakConfig["ClientSecret"];
         options.ResponseType = "code";
         
         options.Scope.Clear();
@@ -68,6 +68,7 @@ try
         options.Scope.Add("email");
         options.Scope.Add("profile");
         options.Scope.Add("offline_access"); // Required for refresh tokens
+        options.Scope.Add("bespoke_bff_api"); // Required for backend API calls
         
         options.CallbackPath = "/signin-oidc";
         options.SignedOutCallbackPath = "/signout-callback-oidc";
@@ -155,7 +156,7 @@ try
     builder.Services.AddOpenIdConnectAccessTokenManagement(options =>
     {
         options.RefreshBeforeExpiration = TimeSpan.FromMinutes(5);
-        options.UseChallengeSchemeScopedTokens = true;
+        options.UseChallengeSchemeScopedTokens = false; // Use default user tokens from cookie scheme
     });
 
     // Add CSRF protection
@@ -179,15 +180,15 @@ try
     // Initialize BFF configuration for use in endpoints and events
     BespokeBff.Configuration.BffConfiguration.AllowedOrigins = allowedOrigins;
 
+    const string cors = "BespokeBffCorsPolicy";
     builder.Services.AddCors(options =>
     {
-        options.AddDefaultPolicy(policy =>
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod()
-                  .AllowCredentials();
-        });
+        options.AddPolicy(cors, policy =>
+            policy.SetIsOriginAllowed(_ => true)
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials()
+                .WithExposedHeaders("X-Pagination"));
     });
 
     var app = builder.Build();
@@ -201,12 +202,11 @@ try
 
     app.UseHttpsRedirection();
     app.UseSerilogRequestLogging();
-    
-    app.UseCors();
-    
+
+    app.UseCors(cors);
     app.UseAuthentication();
     app.UseAuthorization();
-    
+
     app.UseCsrfProtection();
 
     // Map YARP routes (must be before other endpoints)

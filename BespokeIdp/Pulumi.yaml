@@ -1,0 +1,3 @@
+name: bespoke-idp
+runtime: dotnet
+description: Keycloak IDP configuration for BespokeBff using Pulumi

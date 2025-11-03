@@ -1,25 +1,24 @@
-# FusionAuth + .NET BFF Authentication Setup
+# Keycloak + .NET BFF Authentication Setup
 
-This project implements a **Backend for Frontend (BFF)** authentication pattern using FusionAuth as the Identity Provider (IDP) and ASP.NET Core as the BFF with YARP reverse proxy. This provides secure session management with CSRF protection for a TanStack Router frontend application.
+This project implements a **Backend for Frontend (BFF)** authentication pattern using Keycloak as the Identity Provider (IDP) and ASP.NET Core as the BFF with YARP reverse proxy. This provides secure session management with CSRF protection for a TanStack Router frontend application.
 
 ## Architecture Overview
 
 ```mermaid
 graph TB
     UI[TanStack Router UI<br/>localhost:4667] --> BFF[.NET BFF + YARP<br/>localhost:3118]
-    BFF --> FA[FusionAuth<br/>localhost:9011]
-    BFF --> API[Backend APIs<br/>localhost:7001-7002]
-    FA --> PG[(PostgreSQL<br/>localhost:5433)]
-    FA --> OS[(OpenSearch<br/>localhost:9200)]
-    
+    BFF --> KC[Keycloak<br/>localhost:8181]
+    BFF --> API[Backend APIs<br/>localhost:5160]
+    KC --> PG[(PostgreSQL<br/>localhost:5433)]
+
     subgraph "Authentication Flow"
         UI -.->|1. Login Click| BFF
-        BFF -.->|2. Redirect| FA
-        FA -.->|3. Login Form| User[User]
-        User -.->|4. Credentials| FA
-        FA -.->|5. Auth Code| BFF
-        BFF -.->|6. Exchange Token| FA
-        FA -.->|7. ID Token| BFF
+        BFF -.->|2. Redirect| KC
+        KC -.->|3. Login Form| User[User]
+        User -.->|4. Credentials| KC
+        KC -.->|5. Auth Code| BFF
+        BFF -.->|6. Exchange Token| KC
+        KC -.->|7. ID Token + Access Token| BFF
         BFF -.->|8. Set Cookie| UI
     end
 ```
@@ -30,32 +29,59 @@ graph TB
 - Docker & Docker Compose
 - .NET 9.0 SDK
 - Node.js (18+) & pnpm
+- Pulumi CLI
 
-### 1. Start FusionAuth Infrastructure
+### 1. Start Keycloak Infrastructure
 
 ```bash
-# Start FusionAuth, PostgreSQL, and OpenSearch
+# Start Keycloak and PostgreSQL
 docker compose up -d
 
-# Run setup script (idempotent)
-./setup-fusionauth.sh
+# Wait for Keycloak to be ready (can take 30-60 seconds)
+docker compose logs -f keycloak
+# Look for: "Keycloak 26.0 started"
 ```
 
-### 2. Start the BFF
+### 2. Configure Keycloak with Pulumi
 
 ```bash
-cd BespokeBff
+cd BespokeIdp
+
+# Install dependencies
+dotnet restore
+
+# Login to Pulumi (local backend)
+pulumi login --local
+
+# Set Keycloak credentials (same as in .env)
+pulumi config set keycloak:username admin --secret
+pulumi config set keycloak:password admin --secret
+
+# Deploy Keycloak configuration
+pulumi up
+```
+
+This will configure:
+- **Realm**: BespokeBff
+- **Custom Scope/Audience**: `bespoke_bff_api`
+- **Clients**: `bespoke_bff` (Authorization Code + PKCE), `bespoke_api_machine` (Client Credentials)
+- **Users**: admin@example.local, test@example.local
+
+### 3. Start the BFF
+
+```bash
+cd ../BespokeBff
 dotnet run
 ```
 
-### 3. Start the React UI
+### 4. Start the React UI
 
 ```bash
 cd Ui/example-ui
 pnpm dev
 ```
 
-### 4. Test Authentication
+### 5. Test Authentication
 
 Visit http://localhost:4667 and click "Login" to test the flow.
 
@@ -71,15 +97,16 @@ The Backend for Frontend (BFF) pattern provides several security advantages:
 - **CORS Protection**: Strict origin validation with credential requirements
 - **Token Refresh**: Automatic token refresh with Duende AccessTokenManagement
 - **API Proxying**: YARP reverse proxy for seamless backend API integration
+- **Proper Audience Validation**: Keycloak supports custom audiences natively
 
 ### Authentication Flow
 
 #### Login Flow
 
-1. **User clicks Login** → UI calls `/auth/login` on BFF
-2. **BFF redirects** → User sent to FusionAuth login page
-3. **User authenticates** → Enters credentials on FusionAuth
-4. **Authorization code** → FusionAuth redirects back with auth code
+1. **User clicks Login** → UI calls `/bff/login` on BFF
+2. **BFF redirects** → User sent to Keycloak login page
+3. **User authenticates** → Enters credentials on Keycloak
+4. **Authorization code** → Keycloak redirects back with auth code
 5. **Token exchange** → BFF exchanges code for ID/access tokens
 6. **Session creation** → BFF creates secure session cookie
 7. **User redirected** → Back to UI, now authenticated
@@ -89,13 +116,14 @@ The Backend for Frontend (BFF) pattern provides several security advantages:
 1. **UI makes request** → With session cookie to BFF endpoint
 2. **BFF validates session** → Checks cookie and user state
 3. **Token attached** → BFF adds bearer token to downstream API calls
-4. **Response returned** → BFF returns data to UI
+4. **API validates token** → Checks JWT signature, issuer, audience, lifetime
+5. **Response returned** → BFF returns data to UI
 
 #### Logout Flow
 
-1. **User clicks Logout** → UI calls `/auth/logout` on BFF
-2. **BFF initiates logout** → Redirects to FusionAuth logout endpoint
-3. **Session cleanup** → FusionAuth and BFF clear sessions
+1. **User clicks Logout** → UI calls `/bff/logout` on BFF
+2. **BFF initiates logout** → Redirects to Keycloak logout endpoint
+3. **Session cleanup** → Keycloak and BFF clear sessions
 4. **User redirected** → Back to UI, now logged out
 
 ## 📡 BFF API Endpoints
@@ -115,8 +143,7 @@ The Backend for Frontend (BFF) pattern provides several security advantages:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/{**catch-all}` | ALL | Proxies to backend API (localhost:7001) |
-| `/auth-api/{**catch-all}` | ALL | Proxies to auth API (localhost:7002) |
+| `/api/{**catch-all}` | ALL | Proxies to backend API (localhost:5160) |
 
 ### Example Responses
 
@@ -142,6 +169,10 @@ The Backend for Frontend (BFF) pattern provides several security advantages:
     {
       "type": "email",
       "value": "test@example.local"
+    },
+    {
+      "type": "aud",
+      "value": "bespoke_bff_api"
     }
   ]
 }
@@ -149,117 +180,57 @@ The Backend for Frontend (BFF) pattern provides several security advantages:
 
 ## 🛠 Configuration
 
-### FusionAuth Application Settings
+### Keycloak Configuration (via Pulumi)
 
-The setup script configures FusionAuth with these settings:
+See `BespokeIdp/RealmBuild.cs` for the complete Keycloak configuration.
 
-```json
-{
-  "name": "MyApp BFF",
-  "clientId": "fd123988-b649-4c44-afff-987ef6bd66a6",
-  "clientSecret": "super-secret-client-secret-new",
-  "authorizedRedirectURLs": [
-    "http://localhost:3118/signin-oidc",
-    "https://localhost:3118/signin-oidc",
-    "http://localhost:3118/signout-callback-oidc",
-    "http://localhost:4667/",
-    "http://localhost:4667"
-  ],
-  "authorizedOriginURLs": [
-    "http://localhost:3118",
-    "https://localhost:3118", 
-    "http://localhost:4667",
-    "https://localhost:4667"
-  ],
-  "enabledGrants": [
-    "authorization_code",
-    "refresh_token"
-  ]
-}
-```
+Key configuration includes:
+- **Realm**: BespokeBff
+- **Client ID**: `bespoke_bff`
+- **Client Secret**: `2274075d-3358-4f59-a13a-ddf4c6906b1e`
+- **Audience**: `bespoke_bff_api` (custom scope with audience mapper)
+- **Redirect URIs**: http://localhost:3118/*, http://localhost:4667/*
+- **PKCE**: Required (S256)
+- **Grant Types**: authorization_code, refresh_token
 
 ### .NET BFF Configuration
 
-#### appsettings.json
+#### appsettings.Development.json
 ```json
 {
-  "FusionAuth": {
-    "Authority": "http://localhost:9011",
-    "ClientId": "fd123988-b649-4c44-afff-987ef6bd66a6",
-    "ClientSecret": "super-secret-client-secret-new",
-    "Audience": "fd123988-b649-4c44-afff-987ef6bd66a6"
+  "Keycloak": {
+    "Authority": "http://localhost:8181/realms/BespokeBff",
+    "ClientId": "bespoke_bff",
+    "ClientSecret": "2274075d-3358-4f59-a13a-ddf4c6906b1e",
+    "Audience": "bespoke_bff_api"
+  },
+  "Cors": {
+    "AllowedOrigins": [
+      "http://localhost:4667",
+      "https://localhost:4667"
+    ]
   }
 }
 ```
 
-#### Program.cs Key Features
+### Test API Configuration
 
-```csharp
-// OIDC Configuration
-services.AddAuthentication(options =>
+#### appsettings.json
+```json
 {
-    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
-})
-.AddCookie(options =>
-{
-    options.Cookie.Name = "__Host-MyAppBFF";
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.SameSite = SameSiteMode.Strict;
-    options.Cookie.HttpOnly = true;
-    options.ExpireTimeSpan = TimeSpan.FromHours(1);
-    options.SlidingExpiration = true;
-})
-.AddOpenIdConnect(options =>
-{
-    // FusionAuth configuration
-    options.Authority = fusionAuthConfig["Authority"];
-    options.ClientId = fusionAuthConfig["ClientId"];
-    options.ClientSecret = fusionAuthConfig["ClientSecret"];
-    
-    // Enhanced token management and logout handling
-    options.Scope.Add("offline_access"); // Required for refresh tokens
-    options.SaveTokens = true;
-    options.GetClaimsFromUserInfoEndpoint = true;
-    options.UsePkce = true;
-    
-    options.Events = new OpenIdConnectEvents
-    {
-        OnRedirectToIdentityProviderForSignOut = context =>
-        {
-            var logoutUri = $"http://localhost:9011/oauth2/logout?client_id={context.Options.ClientId}";
-            // Handle post-logout redirect URI with proper encoding
-            if (!string.IsNullOrEmpty(context.Properties.RedirectUri)) {
-                logoutUri += $"&post_logout_redirect_uri={Uri.EscapeDataString(context.Properties.RedirectUri)}";
-            }
-            context.Response.Redirect(logoutUri);
-            context.HandleResponse();
-            return Task.CompletedTask;
-        }
-    };
-});
-
-// Add Duende Access Token Management for automatic token refresh
-services.AddMemoryCache();
-services.AddDistributedMemoryCache();
-services.AddOpenIdConnectAccessTokenManagement(options =>
-{
-    options.RefreshBeforeExpiration = TimeSpan.FromMinutes(5);
-    options.UseChallengeSchemeScopedTokens = true;
-});
-
-// Add YARP reverse proxy with authentication header transform
-services.AddReverseProxy()
-    .LoadFromConfig(Configuration.GetSection("ReverseProxy"))
-    .AddTransforms<AuthHeaderTransform>();
-
-// Add CSRF protection middleware
-services.AddCsrfProtection(options =>
-{
-    options.HeaderName = "X-CSRF";
-    options.RequiredHeaderValue = "1";
-});
+  "Keycloak": {
+    "Authority": "http://localhost:8181/realms/BespokeBff",
+    "ValidAudience": "bespoke_bff_api"
+  }
+}
 ```
+
+The Test API validates JWT tokens with proper audience validation:
+- **Issuer**: http://localhost:8181/realms/BespokeBff
+- **Audience**: bespoke_bff_api
+- **Signature**: Validated via JWKS from Keycloak
+
+Unlike FusionAuth free tier, Keycloak supports custom audiences natively, so no complex workarounds are needed!
 
 ### TanStack Router UI Integration
 
@@ -300,7 +271,7 @@ export async function getCurrentUser(): Promise<User | null> {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' }
   })
-  
+
   return response.ok ? await response.json() : null
 }
 
@@ -321,7 +292,7 @@ export async function bffPost<T>(url: string, data?: any): Promise<T> {
     },
     body: data ? JSON.stringify(data) : undefined
   })
-  
+
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   return response.json()
 }
@@ -331,8 +302,9 @@ export async function bffPost<T>(url: string, data?: any): Promise<T> {
 
 ### Default Credentials
 
-- **FusionAuth Admin**: http://localhost:9011/admin
+- **Keycloak Admin Console**: http://localhost:8181/admin (admin / admin)
 - **Test User**: `test@example.local` / `password`
+- **Admin User**: `admin@example.local` / `password123`
 
 ### Ports
 
@@ -340,11 +312,9 @@ export async function bffPost<T>(url: string, data?: any): Promise<T> {
 |---------|------|-------------|
 | TanStack Router UI | 4667 | Frontend application |
 | .NET BFF + YARP | 3118 | Backend for Frontend with reverse proxy |
-| Backend API | 7001 | Main backend API (proxied via /api/*) |
-| Auth API | 7002 | Authentication API (proxied via /auth-api/*) |
-| FusionAuth | 9011 | Identity provider |
-| PostgreSQL | 5433 | FusionAuth database |
-| OpenSearch | 9200 | FusionAuth search engine |
+| Test API | 5160 | Test backend API (proxied via /api/*) |
+| Keycloak | 8181 | Identity provider |
+| PostgreSQL | 5433 | Keycloak database |
 
 ### Docker Services
 
@@ -353,15 +323,26 @@ export async function bffPost<T>(url: string, data?: any): Promise<T> {
 docker compose ps
 
 # View logs
-docker compose logs fusionauth
+docker compose logs keycloak
 docker compose logs db
 
 # Restart services
-docker compose restart fusionauth
+docker compose restart keycloak
 
 # Clean restart
 docker compose down && docker compose up -d
 ```
+
+### Updating Keycloak Configuration
+
+After making changes to `BespokeIdp/RealmBuild.cs`:
+
+```bash
+cd BespokeIdp
+pulumi up
+```
+
+Pulumi will show you a preview of changes before applying them.
 
 ## 🛡 Security Considerations
 
@@ -377,15 +358,18 @@ docker compose down && docker compose up -d
 - [ ] Implement proper error handling
 - [ ] Add rate limiting
 - [ ] Set up monitoring and logging
+- [ ] Use Keycloak production mode (not dev mode)
+- [ ] Configure Keycloak with proper database settings
+- [ ] Enable Keycloak security features (brute force protection, etc.)
 
 ### Environment Variables
 
 For production, use environment variables instead of hardcoded values:
 
 ```bash
-export FUSIONAUTH_AUTHORITY="https://auth.yourdomain.com"
-export FUSIONAUTH_CLIENT_ID="your-client-id"
-export FUSIONAUTH_CLIENT_SECRET="your-client-secret"
+export KEYCLOAK_AUTHORITY="https://auth.yourdomain.com/realms/BespokeBff"
+export KEYCLOAK_CLIENT_ID="your-client-id"
+export KEYCLOAK_CLIENT_SECRET="your-client-secret"
 ```
 
 ## 🚨 Troubleshooting
@@ -393,29 +377,35 @@ export FUSIONAUTH_CLIENT_SECRET="your-client-secret"
 ### Common Issues
 
 #### "Invalid redirect_uri" Error
-- Verify redirect URLs are configured in FusionAuth application
+- Verify redirect URLs are configured in Keycloak client (via Pulumi)
 - Check that URLs match exactly (including trailing slashes)
+- Run `pulumi up` to ensure configuration is deployed
 
 #### CORS Errors
 - Ensure BFF CORS policy includes UI origin
 - Verify credentials are being sent with requests
+- Check Keycloak client web origins configuration
 
 #### Session Not Persisting
 - Check cookie domain and path settings
 - Verify `SameSite` policy is appropriate
 - Ensure HTTPS is used in production
 
-#### Logout Not Working
-- Verify post-logout redirect URIs are configured
-- Check FusionAuth logout URL configuration
-- Ensure custom logout event handler is working
+#### Keycloak Not Starting
+- Check if port 8181 is already in use
+- Verify PostgreSQL is healthy: `docker compose ps`
+- Check logs: `docker compose logs keycloak`
+
+#### Pulumi Deployment Fails
+- Ensure Keycloak is running and healthy
+- Verify admin credentials are correct
+- Check Pulumi config: `pulumi config`
 
 ### Debug Tools
 
 ```bash
-# Check FusionAuth application config
-curl -H "Authorization: bf69486b-4733-4470-a592-f1bfce7af580" \
-  http://localhost:9011/api/application/fd123988-b649-4c44-afff-987ef6bd66a6
+# Check Keycloak health
+curl http://localhost:8181/health/ready
 
 # Test BFF endpoints
 curl -i http://localhost:3118/bff/status
@@ -428,12 +418,28 @@ curl -i -X POST -b "__Host-MyAppBFF=your-session-cookie" http://localhost:3118/b
 curl -i -X POST -H "X-CSRF: 1" -b "__Host-MyAppBFF=your-session-cookie" http://localhost:3118/bff/refresh
 
 # View container logs
-docker compose logs -f fusionauth
+docker compose logs -f keycloak
+
+# Access Keycloak admin console
+open http://localhost:8181/admin
 ```
 
 ## 📚 Additional Resources
 
-- [FusionAuth Documentation](https://fusionauth.io/docs/)
+- [Keycloak Documentation](https://www.keycloak.org/documentation)
+- [Pulumi Keycloak Provider](https://www.pulumi.com/registry/packages/keycloak/)
 - [ASP.NET Core Authentication](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/)
 - [OpenID Connect Specification](https://openid.net/connect/)
 - [BFF Pattern](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-browser-based-apps-19)
+
+## 🔄 Migration from FusionAuth
+
+This project was migrated from FusionAuth to Keycloak. Key improvements:
+
+1. **Native Custom Audience Support**: No more complex workarounds for audience validation
+2. **Simplified JWT Validation**: Standard OIDC claims work out of the box
+3. **Infrastructure as Code**: Pulumi-based configuration instead of manual kickstart files
+4. **Better Production Support**: Keycloak has robust production features and scaling options
+5. **Open Source**: Fully open source with no paid-tier limitations
+
+For migration details, see the commit history on the `keycloak` branch.

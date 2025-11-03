@@ -7,54 +7,43 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Configure JWT authentication with FusionAuth
-var fusionAuthConfig = builder.Configuration.GetSection("FusionAuth");
+// Configure JWT authentication with Keycloak
+var keycloakConfig = builder.Configuration.GetSection("Keycloak");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = fusionAuthConfig["Authority"];
+        options.Authority = keycloakConfig["Authority"];
         options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+        options.Audience = keycloakConfig["ValidAudience"];
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            // FusionAuth free tier limitation workaround:
-            // Custom audience is a paid feature, so we validate against the BFF Application ID
             ValidateIssuer = true,
-            ValidIssuer = fusionAuthConfig["ValidIssuer"],
-
             ValidateAudience = true,
-            ValidAudience = fusionAuthConfig["ValidAudience"], // BFF Application ID
-
+            ValidAudience = keycloakConfig["ValidAudience"],
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.FromMinutes(5)
         };
     });
 
-// Add authorization with applicationId policy for API-specific access control
-// This is the key part of the workaround - ensures only the BFF can access this API
-// NOTE: FusionAuth uses "applicationId" claim instead of "client_id"
+// Add authorization
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("BffClientOnly", policy =>
-    {
-        policy.RequireAuthenticatedUser();
-        policy.RequireClaim("applicationId", fusionAuthConfig["ExpectedClientId"]!);
-    });
 });
 
 // Add CORS to allow BFF to proxy requests
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                      ?? new[] { "http://localhost:3118", "https://localhost:3118" };
+const string cors = "BespokeBffApiCorsPolicy";
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins(allowedOrigins)
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
+    options.AddPolicy(cors, builder => 
+        builder.SetIsOriginAllowed(_ => true)
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials()
+            .WithExposedHeaders("X-Pagination"));
 });
 
 var app = builder.Build();
@@ -65,7 +54,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCors();
+app.UseCors(cors);
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -97,7 +86,7 @@ app.MapGet("/api/debug-claims", (HttpContext context) =>
 .WithName("DebugClaims")
 .RequireAuthorization(); // Only requires JWT validation, no client_id policy
 
-// Secure endpoint - requires JWT validation + applicationId check
+// Secure endpoint - requires JWT validation with proper audience
 app.MapPost("/api/secure", (SecureRequest request, HttpContext context) =>
 {
     var user = context.User;
@@ -106,24 +95,24 @@ app.MapPost("/api/secure", (SecureRequest request, HttpContext context) =>
 
     // Extract key claims for debugging
     var audience = user.FindFirst("aud")?.Value;
-    var applicationId = user.FindFirst("applicationId")?.Value; // FusionAuth uses applicationId
+    var clientId = user.FindFirst("azp")?.Value ?? user.FindFirst("client_id")?.Value; // Keycloak uses azp (authorized party)
     var issuer = user.FindFirst("iss")?.Value;
 
     return Results.Ok(new SecureResponse
     {
-        Message = $"✅ Hello {request.Name}! Full JWT validation passed (iss, aud, lifetime, applicationId)",
+        Message = $"✅ Hello {request.Name}! Full JWT validation passed (iss, aud, lifetime)",
         Data = request.Data,
         Timestamp = DateTime.UtcNow.ToString("o"),
         UserId = userId,
         Email = email,
         Issuer = issuer,
         Audience = audience,
-        ClientId = applicationId, // Return as ClientId for compatibility
+        ClientId = clientId,
         Claims = user.Claims.Select(c => new { c.Type, c.Value }).ToList()
     });
 })
 .WithName("SecureEndpoint")
-.RequireAuthorization("BffClientOnly"); // Enforces both JWT validation AND applicationId check
+.RequireAuthorization(); // Enforces JWT validation with audience, issuer, and lifetime checks
 
 app.Run();
 
