@@ -32,19 +32,19 @@ try
     })
     .AddCookie("cookie", options =>
     {
-        // options.Cookie.Name = "__Host-BespokeBFF";
-        // options.Cookie.SameSite = SameSiteMode.Strict;
-        // options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.Name = "__Host-BespokeBFF";
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         // options.Cookie.HttpOnly = true;
-        // options.ExpireTimeSpan = TimeSpan.FromHours(1);
-        // options.SlidingExpiration = true;
-        
-        options.Cookie.Name = "BespokeBFF";
-        options.Cookie.SameSite = SameSiteMode.Lax; // Changed from Strict to Lax for cross-origin redirects
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Allows HTTP in dev, HTTPS in prod
-        options.Cookie.HttpOnly = true;
-        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.ExpireTimeSpan = TimeSpan.FromHours(1);
         options.SlidingExpiration = true;
+        
+        // options.Cookie.Name = "BespokeBFF";
+        // options.Cookie.SameSite = SameSiteMode.Lax; // Changed from Strict to Lax for cross-origin redirects
+        // options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Allows HTTP in dev, HTTPS in prod
+        // options.Cookie.HttpOnly = true;
+        // options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        // options.SlidingExpiration = true;
     })
     .AddOpenIdConnect("oidc", options =>
     {

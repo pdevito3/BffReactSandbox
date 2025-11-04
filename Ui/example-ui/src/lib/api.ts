@@ -1,9 +1,8 @@
 import axios from "axios";
 import { Notification } from "./notification";
-import { login } from "../hooks/use-auth";
 
 // API utilities with CSRF protection
-export const BFF_BASE_URL = "http://localhost:3118";
+export const BFF_BASE_URL = "https://localhost:3118";
 
 /**
  * Get the login URL
