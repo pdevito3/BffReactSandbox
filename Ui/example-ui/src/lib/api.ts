@@ -1,4 +1,5 @@
 import axios from "axios";
+import { login } from "~/hooks/use-auth";
 import { Notification } from "./notification";
 
 // API utilities with CSRF protection
@@ -39,7 +40,8 @@ export const myAppApi = axios.create({
 function commonRejection(error: any) {
   // Handle 401 Unauthorized - redirect to login with current page for return
   if (error?.response?.status === 401) {
-    const currentPath = window.location.pathname + window.location.search + window.location.hash;
+    const currentPath =
+      window.location.pathname + window.location.search + window.location.hash;
     login(currentPath);
     return;
   }
