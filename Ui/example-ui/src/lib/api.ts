@@ -1,5 +1,6 @@
 import axios from "axios";
 import { Notification } from "./notification";
+import { login } from "../hooks/use-auth";
 
 // API utilities with CSRF protection
 export const BFF_BASE_URL = "http://localhost:3118";
@@ -9,13 +10,6 @@ export const BFF_BASE_URL = "http://localhost:3118";
  */
 export function getLoginUrl() {
   return `/bff/login`;
-}
-
-/**
- * Redirect to login
- */
-function login() {
-  window.location.href = getLoginUrl();
 }
 
 /**
@@ -44,9 +38,10 @@ export const myAppApi = axios.create({
  * Common error handler for all API responses
  */
 function commonRejection(error: any) {
-  // Handle 401 Unauthorized - redirect to login
+  // Handle 401 Unauthorized - redirect to login with current page for return
   if (error?.response?.status === 401) {
-    login();
+    const currentPath = window.location.pathname + window.location.search + window.location.hash;
+    login(currentPath);
     return;
   }
 

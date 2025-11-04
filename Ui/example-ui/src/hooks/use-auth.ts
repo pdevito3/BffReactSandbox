@@ -109,8 +109,17 @@ async function fetchCurrentUser(): Promise<User | null> {
 }
 
 // Authentication actions
-export function login() {
-  window.location.href = `/bff/login`;
+export function login(returnUrl?: string) {
+  let url = `/bff/login`;
+
+  // Append returnUrl if provided
+  if (returnUrl) {
+    url = `${url}?returnUrl=${encodeURIComponent(returnUrl)}`;
+  }
+
+  console.log('[Auth] Login redirect:', url);
+  console.log('[Auth] Return URL:', returnUrl);
+  window.location.href = url;
 }
 
 export function logout(returnUrl?: string, logoutUrl?: string) {

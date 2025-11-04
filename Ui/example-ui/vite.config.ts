@@ -6,7 +6,7 @@ import tsConfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   server: {
-    port: 3000,
+    port: 4667,
     host: "localhost",
     hmr: {
       overlay: true,

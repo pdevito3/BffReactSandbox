@@ -79,7 +79,7 @@ function ApiTest() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => login()}>Login</Button>
+            <Button onClick={() => login(window.location.pathname)}>Login</Button>
           </CardContent>
         </Card>
       )}

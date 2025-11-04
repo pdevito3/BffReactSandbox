@@ -32,7 +32,7 @@ export function AuthButton() {
 
   return (
     <Button
-      onClick={() => login()}
+      onClick={() => login(window.location.pathname)}
       size="sm"
       className="gap-2"
     >
