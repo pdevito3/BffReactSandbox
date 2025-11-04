@@ -60,8 +60,8 @@ const data = {
           url: "/deferred",
         },
         {
-          title: "API Test",
-          url: "/api-test",
+          title: "Auth Test",
+          url: "/auth-test",
         },
         {
           title: "Advanced Filters",
