@@ -32,17 +32,10 @@ try
     })
     .AddCookie("cookie", options =>
     {
-        // options.Cookie.Name = "__Host-BespokeBFF";
-        // options.Cookie.SameSite = SameSiteMode.Strict;
-        // options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        // options.Cookie.HttpOnly = true;
-        // options.ExpireTimeSpan = TimeSpan.FromHours(1);
-        // options.SlidingExpiration = true;
-        
-        options.Cookie.Name = "BespokeBFF";
-        options.Cookie.SameSite = SameSiteMode.Lax; // Changed from Strict to Lax for cross-origin redirects
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Allows HTTP in dev, HTTPS in prod
-        options.Cookie.HttpOnly = true;
+        options.Cookie.Name = builder.Environment.IsDevelopment() ? "BespokeBFF" : "__Host-BespokeBFF";
+        options.Cookie.SameSite = builder.Environment.IsDevelopment() ? SameSiteMode.Lax : SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() ? CookieSecurePolicy.SameAsRequest  : CookieSecurePolicy.Always;
+        options.Cookie.HttpOnly = builder.Environment.IsDevelopment();
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
     })
