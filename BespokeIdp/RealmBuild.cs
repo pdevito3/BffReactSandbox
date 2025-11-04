@@ -33,6 +33,10 @@ class RealmBuild : Stack
             "http://localhost:3118",
             redirectUris: new InputList<string>()
             {
+                "http://localhost:3118/signin-oidc",
+                "http://localhost:3118/signout-callback-oidc",
+                "http://localhost:3118/*",
+                "http://localhost:4667/*",
                 "https://localhost:3118/signin-oidc",
                 "https://localhost:3118/signout-callback-oidc",
                 "https://localhost:3118/*",
@@ -40,6 +44,8 @@ class RealmBuild : Stack
             },
             webOrigins: new InputList<string>()
             {
+                "http://localhost:3118",
+                "http://localhost:4667",
                 "https://localhost:3118",
                 "https://localhost:4667"
             }

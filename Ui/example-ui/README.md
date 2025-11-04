@@ -19,46 +19,6 @@ pnpm dev
 
 This starts your app in development mode, rebuilding assets on file changes.
 
-## HTTPS Configuration
-
-This project is configured to run over HTTPS using `@vitejs/plugin-basic-ssl`, which automatically generates and caches a self-signed SSL certificate.
-
-### Running with HTTPS
-
-When you run `pnpm dev`, the development server will start at:
-
-```
-https://localhost:4667
-```
-
-### Browser Security Warning
-
-On first run, your browser will display a security warning because the certificate is self-signed. This is expected behavior. To proceed:
-
-1. Click "Advanced" (or "Show Details")
-2. Click "Proceed to localhost" (or "Accept the Risk and Continue")
-
-### Trusting the Certificate (macOS)
-
-To avoid the browser warning on subsequent visits, you can add the self-signed certificate to your system's trusted certificates:
-
-```sh
-security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db <path-to-cert>
-```
-
-The certificate will be automatically created in your project's cache folder on first run.
-
-### BFF Proxy Configuration
-
-The development server proxies the following routes to the BFF server at `http://localhost:3118`:
-
-- `/bff`
-- `/signin-oidc`
-- `/signout-callback-oidc`
-- `/api`
-
-If your BFF server also runs on HTTPS, update the proxy targets in `vite.config.ts` from `http://` to `https://`.
-
 ## Editing and previewing the docs of TanStack projects locally
 
 The documentations for all TanStack projects except for `React Charts` are hosted on [https://tanstack.com](https://tanstack.com), powered by this TanStack Router app.
