@@ -16,18 +16,18 @@ export function UserInfo() {
     refreshTokens.mutate()
   }
 
-  // Handle refresh token mutation results
+  // Handle session validation mutation results
   useEffect(() => {
     if (refreshTokens.isSuccess && refreshTokens.data) {
       if (refreshTokens.data.success) {
-        setRefreshMessage('Tokens refreshed successfully!')
+        setRefreshMessage('Session is active and valid!')
       } else {
-        setRefreshMessage(refreshTokens.data.message || 'Token refresh failed')
+        setRefreshMessage(refreshTokens.data.message || 'Session validation failed')
       }
       // Clear message after 3 seconds
       setTimeout(() => setRefreshMessage(null), 3000)
     } else if (refreshTokens.isError) {
-      setRefreshMessage('Failed to refresh tokens')
+      setRefreshMessage('Failed to validate session')
       setTimeout(() => setRefreshMessage(null), 3000)
     }
   }, [refreshTokens.isSuccess, refreshTokens.isError, refreshTokens.data])
@@ -133,13 +133,13 @@ export function UserInfo() {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               onClick={handleRefreshTokens}
               disabled={refreshTokens.isPending}
               className="h-8 w-8 p-0"
-              title="Refresh authentication tokens"
+              title="Validate session status"
             >
               <Clock className={`h-4 w-4 ${refreshTokens.isPending ? 'animate-spin' : ''}`} />
             </Button>
@@ -190,39 +190,21 @@ export function UserInfo() {
           )}
         </div>
 
-        {user.tokenInfo && (
+        {user.tokenInfo?.sessionExpiresAt && (
           <>
             <Separator />
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Timer className="h-4 w-4" />
-                Token Information
+                Session Information
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {user.tokenInfo.accessTokenExpiresAt && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground">Access Token Expires</div>
-                    <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                      {new Date(user.tokenInfo.accessTokenExpiresAt).toLocaleString()}
-                    </div>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-muted-foreground">Session Expires</div>
+                  <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                    {new Date(user.tokenInfo.sessionExpiresAt).toLocaleString()}
                   </div>
-                )}
-                {user.tokenInfo.sessionExpiresAt && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground">Session Expires</div>
-                    <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                      {new Date(user.tokenInfo.sessionExpiresAt).toLocaleString()}
-                    </div>
-                  </div>
-                )}
-                {user.tokenInfo.sessionIssuedAt && (
-                  <div className="space-y-2 md:col-span-2">
-                    <div className="text-xs font-medium text-muted-foreground">Session Last Refreshed</div>
-                    <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                      {new Date(user.tokenInfo.sessionIssuedAt).toLocaleString()}
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           </>

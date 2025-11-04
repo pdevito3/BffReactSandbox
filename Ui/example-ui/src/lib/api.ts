@@ -5,32 +5,17 @@ import { Notification } from "./notification";
 export const BFF_BASE_URL = "http://localhost:3118";
 
 /**
- * Get the login URL with optional return URL
+ * Get the login URL
  */
-export function getLoginUrl(returnUrl?: string) {
-  const url = new URL("/bff/login", BFF_BASE_URL);
-  if (returnUrl) {
-    url.searchParams.set("returnUrl", returnUrl);
-  }
-  return url.toString();
+export function getLoginUrl() {
+  return `/bff/login`;
 }
 
 /**
- * Redirect to login, preserving the current route
+ * Redirect to login
  */
 function login() {
-  // Capture the full current path including search params and hash
-  const currentPath =
-    window.location.pathname + window.location.search + window.location.hash;
-
-  // Only preserve the path if we're not already on the login page
-  // This prevents redirect loops
-  const returnUrl =
-    !currentPath.startsWith("/login") && currentPath !== "/"
-      ? currentPath
-      : undefined;
-
-  window.location.href = getLoginUrl(returnUrl);
+  window.location.href = getLoginUrl();
 }
 
 /**

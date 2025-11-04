@@ -12,7 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as RedirectRouteImport } from './routes/redirect'
 import { Route as FilterTestRouteImport } from './routes/filter-test'
 import { Route as DeferredRouteImport } from './routes/deferred'
-import { Route as ApiTestRouteImport } from './routes/api-test'
+import { Route as AuthTestRouteImport } from './routes/auth-test'
 import { Route as PathlessLayoutRouteImport } from './routes/_pathlessLayout'
 import { Route as UsersRouteRouteImport } from './routes/users.route'
 import { Route as PostsRouteRouteImport } from './routes/posts.route'
@@ -41,9 +41,9 @@ const DeferredRoute = DeferredRouteImport.update({
   path: '/deferred',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiTestRoute = ApiTestRouteImport.update({
-  id: '/api-test',
-  path: '/api-test',
+const AuthTestRoute = AuthTestRouteImport.update({
+  id: '/auth-test',
+  path: '/auth-test',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PathlessLayoutRoute = PathlessLayoutRouteImport.update({
@@ -112,7 +112,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/posts': typeof PostsRouteRouteWithChildren
   '/users': typeof UsersRouteRouteWithChildren
-  '/api-test': typeof ApiTestRoute
+  '/auth-test': typeof AuthTestRoute
   '/deferred': typeof DeferredRoute
   '/filter-test': typeof FilterTestRoute
   '/redirect': typeof RedirectRoute
@@ -126,7 +126,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/api-test': typeof ApiTestRoute
+  '/auth-test': typeof AuthTestRoute
   '/deferred': typeof DeferredRoute
   '/filter-test': typeof FilterTestRoute
   '/redirect': typeof RedirectRoute
@@ -144,7 +144,7 @@ export interface FileRoutesById {
   '/posts': typeof PostsRouteRouteWithChildren
   '/users': typeof UsersRouteRouteWithChildren
   '/_pathlessLayout': typeof PathlessLayoutRouteWithChildren
-  '/api-test': typeof ApiTestRoute
+  '/auth-test': typeof AuthTestRoute
   '/deferred': typeof DeferredRoute
   '/filter-test': typeof FilterTestRoute
   '/redirect': typeof RedirectRoute
@@ -163,7 +163,7 @@ export interface FileRouteTypes {
     | '/'
     | '/posts'
     | '/users'
-    | '/api-test'
+    | '/auth-test'
     | '/deferred'
     | '/filter-test'
     | '/redirect'
@@ -177,7 +177,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/api-test'
+    | '/auth-test'
     | '/deferred'
     | '/filter-test'
     | '/redirect'
@@ -194,7 +194,7 @@ export interface FileRouteTypes {
     | '/posts'
     | '/users'
     | '/_pathlessLayout'
-    | '/api-test'
+    | '/auth-test'
     | '/deferred'
     | '/filter-test'
     | '/redirect'
@@ -213,7 +213,7 @@ export interface RootRouteChildren {
   PostsRouteRoute: typeof PostsRouteRouteWithChildren
   UsersRouteRoute: typeof UsersRouteRouteWithChildren
   PathlessLayoutRoute: typeof PathlessLayoutRouteWithChildren
-  ApiTestRoute: typeof ApiTestRoute
+  AuthTestRoute: typeof AuthTestRoute
   DeferredRoute: typeof DeferredRoute
   FilterTestRoute: typeof FilterTestRoute
   RedirectRoute: typeof RedirectRoute
@@ -243,11 +243,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeferredRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api-test': {
-      id: '/api-test'
-      path: '/api-test'
-      fullPath: '/api-test'
-      preLoaderRoute: typeof ApiTestRouteImport
+    '/auth-test': {
+      id: '/auth-test'
+      path: '/auth-test'
+      fullPath: '/auth-test'
+      preLoaderRoute: typeof AuthTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_pathlessLayout': {
@@ -400,7 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   PostsRouteRoute: PostsRouteRouteWithChildren,
   UsersRouteRoute: UsersRouteRouteWithChildren,
   PathlessLayoutRoute: PathlessLayoutRouteWithChildren,
-  ApiTestRoute: ApiTestRoute,
+  AuthTestRoute: AuthTestRoute,
   DeferredRoute: DeferredRoute,
   FilterTestRoute: FilterTestRoute,
   RedirectRoute: RedirectRoute,

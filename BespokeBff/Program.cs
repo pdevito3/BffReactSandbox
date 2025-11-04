@@ -1,12 +1,7 @@
-
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
+using Duende.Bff.Yarp;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Serilog;
-using System.Security.Claims;
-using BespokeBff.Middleware;
-using BespokeBff.Endpoints;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -23,38 +18,35 @@ try
         .Enrich.FromLogContext()
         .WriteTo.Console());
 
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
+    // builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddControllers();
+
+    builder.Services.AddBff()
+        .AddRemoteApis();
 
     builder.Services.AddAuthentication(options =>
     {
-        options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+        options.DefaultScheme = "cookie";
+        options.DefaultChallengeScheme = "oidc";
+        options.DefaultSignOutScheme = "oidc";
     })
-    .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+    .AddCookie("cookie", options =>
     {
-        options.Cookie.Name = "__Host-MyAppBFF";
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Strict;
+        // options.Cookie.Name = "__Host-BespokeBFF";
+        // options.Cookie.SameSite = SameSiteMode.Strict;
+        // options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        // options.Cookie.HttpOnly = true;
+        // options.ExpireTimeSpan = TimeSpan.FromHours(1);
+        // options.SlidingExpiration = true;
+        
+        options.Cookie.Name = "BespokeBFF";
+        options.Cookie.SameSite = SameSiteMode.Lax; // Changed from Strict to Lax for cross-origin redirects
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // Allows HTTP in dev, HTTPS in prod
         options.Cookie.HttpOnly = true;
-        options.ExpireTimeSpan = TimeSpan.FromHours(1);
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
-        
-        // automatically revoke refresh token at signout time (if supported)
-        options.Events.OnSigningOut = async e =>
-        {
-            try
-            {
-                await e.HttpContext.RevokeRefreshTokenAsync();
-            }
-            catch (InvalidOperationException)
-            {
-                Log.Debug("Refresh token revocation not supported by identity provider");
-            }
-        };
-        
     })
-    .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+    .AddOpenIdConnect("oidc", options =>
     {
         var keycloakConfig = builder.Configuration.GetSection("Keycloak");
 
@@ -62,123 +54,45 @@ try
         options.ClientId = keycloakConfig["ClientId"];
         options.ClientSecret = keycloakConfig["ClientSecret"];
         options.ResponseType = "code";
-        
+        options.ResponseMode = "query";
+        options.UsePkce = true;
+
+        options.GetClaimsFromUserInfoEndpoint = true;
+        options.MapInboundClaims = false;
+        options.SaveTokens = true;
+
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+
         options.Scope.Clear();
         options.Scope.Add("openid");
         options.Scope.Add("email");
         options.Scope.Add("profile");
         options.Scope.Add("offline_access"); // Required for refresh tokens
         options.Scope.Add("bespoke_bff_api"); // Required for backend API calls
-        
-        options.CallbackPath = "/signin-oidc";
-        options.SignedOutCallbackPath = "/signout-callback-oidc";
-        options.RemoteSignOutPath = "/signout-oidc";
+
+        options.TokenValidationParameters = new()
+        {
+            NameClaimType = "email",
+            RoleClaimType = "role"
+        };
         
         options.Events = new OpenIdConnectEvents
         {
-            OnTicketReceived = (context) =>
-            {
-                // Read returnUrl from Items (stored by Login endpoint)
-                context.Properties.Items.TryGetValue("returnUrl", out var returnUrl);
-
-                Log.Information("OnTicketReceived: returnUrl from items = {ReturnUrl}", returnUrl ?? "null");
-
-                if (string.IsNullOrEmpty(returnUrl))
-                {
-                    // No returnUrl stored, use default redirect
-                    return Task.CompletedTask;
-                }
-
-                // If it's a full URL from an allowed origin, redirect to callback endpoint
-                if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var uri))
-                {
-                    var origin = $"{uri.Scheme}://{uri.Host}:{uri.Port}";
-                    Log.Information("OnTicketReceived: Checking origin {Origin} against allowed origins", origin);
-
-                    if (BespokeBff.Configuration.BffConfiguration.AllowedOrigins.Contains(origin, StringComparer.OrdinalIgnoreCase))
-                    {
-                        Log.Information("OnTicketReceived: Redirecting to /bff/callback to handle external URL");
-                        // Pass the returnUrl as a query parameter so it persists to the callback
-                        context.Properties.RedirectUri = $"/bff/callback?returnUrl={Uri.EscapeDataString(returnUrl)}";
-                    }
-                    else
-                    {
-                        Log.Warning("OnTicketReceived: Origin {Origin} not in allowed origins", origin);
-                        // For disallowed origins, just redirect to root
-                        context.Properties.RedirectUri = "/";
-                    }
-                }
-                else if (returnUrl.StartsWith("/"))
-                {
-                    Log.Information("OnTicketReceived: Setting RedirectUri to relative URL {ReturnUrl}", returnUrl);
-                    context.Properties.RedirectUri = returnUrl;
-                }
-                else
-                {
-                    Log.Information("OnTicketReceived: No valid returnUrl, redirecting to /");
-                    context.Properties.RedirectUri = "/";
-                }
-
-                return Task.CompletedTask;
-            },
             OnRemoteFailure = (context) =>
             {
-                if (context.Failure is AuthenticationFailureException)
+                // https://github.com/dotnet/aspnetcore/issues/45620
+                if (context.Failure?.Message == "Correlation failed.")
                 {
                     context.Response.Redirect("/bff/login");
                     context.HandleResponse();
                 }
 
                 return Task.CompletedTask;
-            }
-        };
-        
-        options.GetClaimsFromUserInfoEndpoint = true;
-        
-        // important! this store the access and refresh token in the authentication session
-        // this is needed to the standard token store to manage the artifacts
-        options.SaveTokens = true;
-        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment(); 
-        options.UsePkce = true;
-        
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            NameClaimType = "email",
-            RoleClaimType = ClaimTypes.Role
+            },
         };
     });
 
-    builder.Services.AddAuthorization();
-
-    // For Duende Access Token Management
-    builder.Services.AddMemoryCache();
-    builder.Services.AddDistributedMemoryCache();
-    builder.Services.AddOpenIdConnectAccessTokenManagement(options =>
-    {
-        options.RefreshBeforeExpiration = TimeSpan.FromMinutes(5);
-        options.UseChallengeSchemeScopedTokens = false; // Use default user tokens from cookie scheme
-    });
-
-    // Add CSRF protection
-    builder.Services.AddCsrfProtection(options =>
-    {
-        options.HeaderName = "X-CSRF";
-        options.RequiredHeaderValue = "1";
-        // Additional paths can be excluded if needed
-        // options.ExcludedPaths.Add("/custom-endpoint");
-    });
-
-    // Add YARP with auth header transform
-    builder.Services.AddReverseProxy()
-        .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
-        .AddTransforms<AuthHeaderTransform>();
-
-    // Add CORS
-    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                         ?? new[] { "http://localhost:4667", "https://localhost:4667" };
-
-    // Initialize BFF configuration for use in endpoints and events
-    BespokeBff.Configuration.BffConfiguration.AllowedOrigins = allowedOrigins;
+    // builder.Services.AddAuthorization();
 
     const string cors = "BespokeBffCorsPolicy";
     builder.Services.AddCors(options =>
@@ -190,31 +104,28 @@ try
                 .AllowCredentials()
                 .WithExposedHeaders("X-Pagination"));
     });
-
+    
     var app = builder.Build();
 
-    // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-    }
-
-    app.UseHttpsRedirection();
-    app.UseSerilogRequestLogging();
-
     app.UseCors(cors);
+    // adds route matching to the middleware pipeline. This middleware looks at the set of endpoints defined in the app, and selects the best match based on the request.
+    app.UseRouting();
+
     app.UseAuthentication();
+    app.UseBff();
     app.UseAuthorization();
 
-    app.UseCsrfProtection();
+    // BFF management endpoints (login, logout, user, etc.)
+    app.MapBffManagementEndpoints();
 
-    // Map YARP routes (must be before other endpoints)
-    app.MapReverseProxy();
+    // Map controllers as BFF API endpoints
+    app.MapControllers()
+        .RequireAuthorization()
+        .AsBffApiEndpoint();
 
-    // Map endpoint groups
-    app.MapBffEndpoints();
-    app.MapHealthEndpoints();
+    // Map remote API endpoint with access token forwarding
+    app.MapRemoteBffApiEndpoint("/api", "http://localhost:5160/api")
+        .RequireAccessToken();
 
     app.Run();
 }

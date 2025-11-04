@@ -1,14 +1,20 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
-import { myAppApi } from "~/lib/api";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { useState } from "react";
 import { useAuth } from "~/hooks/use-auth";
+import { myAppApi } from "~/lib/api";
 
-export const Route = createFileRoute("/api-test")({
+export const Route = createFileRoute("/auth-test")({
   component: ApiTest,
 });
 
@@ -38,7 +44,10 @@ function ApiTest() {
 
   const secureMutation = useMutation({
     mutationFn: async ({ name, data }: { name: string; data: string }) => {
-      const response = await myAppApi.post<SecureResponse>("/secure", { name, data });
+      const response = await myAppApi.post<SecureResponse>("/secure", {
+        name,
+        data,
+      });
       return response.data;
     },
   });
@@ -56,7 +65,8 @@ function ApiTest() {
       <div>
         <h1 className="text-3xl font-bold">API Endpoint Testing</h1>
         <p className="text-muted-foreground mt-2">
-          Test the public and secure endpoints of the TestApi through the BFF proxy
+          Test the public and secure endpoints of the TestApi through the BFF
+          proxy
         </p>
       </div>
 
@@ -78,7 +88,8 @@ function ApiTest() {
         <Card className="border-green-500">
           <CardContent className="pt-6">
             <p className="text-sm">
-              Authenticated as: <span className="font-semibold">{userName}</span>
+              Authenticated as:{" "}
+              <span className="font-semibold">{userName}</span>
             </p>
           </CardContent>
         </Card>

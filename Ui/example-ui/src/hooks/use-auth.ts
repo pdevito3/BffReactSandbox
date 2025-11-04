@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { ApiError, BFF_BASE_URL, myAppBff } from "../lib/api";
+import { ApiError, myAppBff } from "../lib/api";
 
 // Authentication types
 export interface TokenInfo {
@@ -29,18 +29,75 @@ export interface AuthStatus {
 // API functions
 async function fetchAuthStatus(): Promise<AuthStatus> {
   try {
-    const response = await myAppBff.get<AuthStatus>("/status");
-    return response.data;
+    // Duende BFF doesn't have a separate /status endpoint
+    // Use /user endpoint but only return authentication status
+    const response = await myAppBff.get<BffClaim[]>("/user");
+    const claims = response.data;
+    const name =
+      claims.find((c) => c.type === "name")?.value ||
+      claims.find((c) => c.type === "preferred_username")?.value;
+    return { isAuthenticated: true, name };
   } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return { isAuthenticated: false };
+    }
     console.error("Error checking auth status:", error);
     return { isAuthenticated: false };
   }
 }
 
+// Duende BFF returns claims in this format
+interface BffClaim {
+  type: string;
+  value: string;
+}
+
 async function fetchCurrentUser(): Promise<User | null> {
   try {
-    const response = await myAppBff.get<User>("/user");
-    return response.data;
+    const response = await myAppBff.get<BffClaim[]>("/user");
+    const claims = response.data;
+
+    // Helper to get claim value
+    const getClaim = (type: string): string | undefined =>
+      claims.find((c) => c.type === type)?.value;
+
+    // Extract user info from claims
+    const name = getClaim("name") || getClaim("preferred_username");
+    const email = getClaim("email");
+    const givenName = getClaim("given_name");
+    const familyName = getClaim("family_name");
+
+    // Generate initials
+    let initials = "U";
+    if (givenName && familyName) {
+      initials = `${givenName[0]}${familyName[0]}`.toUpperCase();
+    } else if (name) {
+      const parts = name.split(" ");
+      if (parts.length >= 2) {
+        initials = `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+      } else {
+        initials = name.substring(0, 2).toUpperCase();
+      }
+    }
+
+    // Extract token/session info from BFF claims
+    const sessionExpiresIn = getClaim("bff:session_expires_in");
+    const sessionExpiresAt = sessionExpiresIn
+      ? new Date(Date.now() + parseInt(sessionExpiresIn) * 1000).toISOString()
+      : undefined;
+
+    return {
+      isAuthenticated: true,
+      name,
+      email,
+      initials,
+      tokenInfo: {
+        sessionExpiresAt,
+        accessTokenExpiresAt: undefined, // BFF doesn't expose individual token expiry
+        sessionIssuedAt: undefined, // Calculate if needed from session_expires_in
+      },
+      claims: claims.map((c) => ({ type: c.type, value: c.value })),
+    };
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       return { isAuthenticated: false };
@@ -52,51 +109,67 @@ async function fetchCurrentUser(): Promise<User | null> {
 }
 
 // Authentication actions
-export function login(returnUrl?: string) {
-  // If no returnUrl provided, capture the current full URL
-  const finalReturnUrl = returnUrl || window.location.href;
-
-  const url = new URL(`${BFF_BASE_URL}/bff/login`);
-  if (finalReturnUrl) {
-    url.searchParams.set("returnUrl", finalReturnUrl);
-  }
-  window.location.href = url.toString();
+export function login() {
+  window.location.href = `/bff/login`;
 }
 
-export function logout(returnUrl?: string) {
-  const url = new URL(`${BFF_BASE_URL}/bff/logout`);
+export function logout(returnUrl?: string, logoutUrl?: string) {
+  // Use the logout URL from bff:logout_url claim if available (includes CSRF protection)
+  // Otherwise fall back to /bff/logout (not recommended for production)
+  let url = logoutUrl || `/bff/logout`;
+
+  // Append returnUrl if provided
   if (returnUrl) {
-    url.searchParams.set("returnUrl", returnUrl);
+    const separator = url.includes('?') ? '&' : '?';
+    url = `${url}${separator}returnUrl=${encodeURIComponent(returnUrl)}`;
   }
-  window.location.href = url.toString();
+
+  window.location.href = url;
 }
 
-// Refresh current user's tokens
+// Refresh/validate current user's session
+// Note: Duende BFF doesn't have a dedicated refresh endpoint
+// Token refresh is handled automatically by the BFF when forwarding API requests
+// This function validates the session is still active
 export async function refreshTokens(): Promise<{
   success: boolean;
   message?: string;
   expiresAt?: string;
 }> {
   try {
-    const response = await myAppBff.post<{
-      success: boolean;
-      message?: string;
-      expiresAt?: string;
-    }>("/refresh");
-    return response.data;
+    // Fetch user data to validate session is still active
+    const response = await myAppBff.get<BffClaim[]>("/user");
+    const claims = response.data;
+
+    // Extract session expiration info
+    const sessionExpiresIn = claims.find(
+      (c) => c.type === "bff:session_expires_in"
+    )?.value;
+    const expiresAt = sessionExpiresIn
+      ? new Date(Date.now() + parseInt(sessionExpiresIn) * 1000).toISOString()
+      : undefined;
+
+    return {
+      success: true,
+      message: "Session is active",
+      expiresAt,
+    };
   } catch (error) {
-    console.error("Error refreshing tokens:", error);
+    console.error("Error validating session:", error);
 
     if (error instanceof ApiError) {
       return {
         success: false,
-        message: `Token refresh failed: ${error.status} ${error.statusText}`,
+        message:
+          error.status === 401
+            ? "Session expired - please log in again"
+            : `Session validation failed: ${error.status} ${error.statusText}`,
       };
     }
 
     return {
       success: false,
-      message: "Network error during token refresh",
+      message: "Network error during session validation",
     };
   }
 }
@@ -151,6 +224,19 @@ export function useAuth() {
     },
   });
 
+  // Extract bff:logout_url claim for logout
+  const logoutUrl = user?.claims?.find(
+    (c) => c.type === "bff:logout_url"
+  )?.value;
+
+  // Create a logout function that uses the claim-based URL
+  const handleLogout = useCallback(
+    (returnUrl?: string) => {
+      logout(returnUrl, logoutUrl);
+    },
+    [logoutUrl]
+  );
+
   return {
     user,
     loading,
@@ -163,7 +249,7 @@ export function useAuth() {
     invalidateAuth,
     refreshTokens: refreshTokensMutation,
     login,
-    logout,
+    logout: handleLogout,
   };
 }
 

@@ -7,12 +7,32 @@ import tsConfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   server: {
     port: 3000,
-    host: 'localhost',
+    host: "localhost",
     hmr: {
       overlay: true,
     },
     watch: {
       usePolling: false,
+    },
+
+    // these are the proxy routes that will be forwarded to your **BFF**
+    proxy: {
+      "/bff": {
+        target: "http://localhost:3118",
+        secure: false,
+      },
+      "/signin-oidc": {
+        target: "http://localhost:3118",
+        secure: false,
+      },
+      "/signout-callback-oidc": {
+        target: "http://localhost:3118",
+        secure: false,
+      },
+      "/api": {
+        target: "http://localhost:3118",
+        secure: false,
+      },
     },
   },
   plugins: [

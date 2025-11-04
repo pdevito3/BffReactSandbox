@@ -19,7 +19,7 @@ export function AuthButton() {
     return (
       <Button
         variant="outline"
-        onClick={() => logout(window.location.href)}
+        onClick={() => logout(window.location.pathname)}
         size="sm"
         className="gap-2"
       >
@@ -32,7 +32,7 @@ export function AuthButton() {
 
   return (
     <Button
-      onClick={() => login(window.location.href)}
+      onClick={() => login()}
       size="sm"
       className="gap-2"
     >
